@@ -7,6 +7,7 @@ import { ModelPicker } from "./ModelPicker";
 import { ReasoningEffortPicker } from "./ReasoningEffortPicker";
 import { ContextFolderChip } from "./ContextFolderChip";
 import { WorktreePanel } from "./WorktreePanel";
+import { ArtifactsCanvas } from "../../components/ArtifactsCanvas";
 import { useChatScroll } from "./hooks/useChatScroll";
 import { useChatIPC } from "./hooks/useChatIPC";
 import { useChatActions } from "./hooks/useChatActions";
@@ -78,6 +79,7 @@ function Chat({
     initialMessages ?? [],
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [pinnedArtifact, setPinnedArtifact] = useState<string | null>(null);
   useEffect(() => {
     onLoadingChange?.(runId, isLoading);
   }, [runId, isLoading, onLoadingChange]);
@@ -568,6 +570,7 @@ function Chat({
               onDeny={actions.handleDeny}
               onClarifyResolved={handleClarifyResolved}
               onSendMessage={handleGenUISend}
+              onPinArtifact={setPinnedArtifact}
             />
           )}
           <div ref={bottomRef} />
@@ -575,6 +578,13 @@ function Chat({
 
         {contextFolder && worktreeVisible && (
           <WorktreePanel folderPath={contextFolder} />
+        )}
+
+        {pinnedArtifact && (
+          <ArtifactsCanvas
+            response={pinnedArtifact}
+            onClose={() => setPinnedArtifact(null)}
+          />
         )}
       </div>
 

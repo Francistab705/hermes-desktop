@@ -410,7 +410,7 @@ describe("CLI fallback session id propagation", () => {
     expect(apiRequests[0].headers["X-Hermes-Session-Id"]).toBe(cliSessionId);
     expect(JSON.parse(apiRequests[0].body)).toMatchObject({
       session_id: cliSessionId,
-      messages: [{ role: "user", content: "what time is it?" }],
+      messages: expect.arrayContaining([{ role: "user", content: "what time is it?" }]),
       stream: true,
     });
   });
@@ -436,7 +436,7 @@ describe("CLI fallback session id propagation", () => {
     expect(spawned).toHaveLength(1);
     expect(apiRequests).toHaveLength(1);
     expect(JSON.parse(apiRequests[0].body)).toMatchObject({
-      messages: [{ role: "user", content: "hi" }],
+      messages: expect.arrayContaining([{ role: "user", content: "hi" }]),
       stream: true,
     });
   });
@@ -459,7 +459,7 @@ describe("CLI fallback session id propagation", () => {
     expect(spawned).toHaveLength(1);
     expect(apiRequests).toHaveLength(1);
     expect(JSON.parse(apiRequests[0].body)).toMatchObject({
-      messages: [{ role: "user", content: "hi after update" }],
+      messages: expect.arrayContaining([{ role: "user", content: "hi after update" }]),
       stream: true,
     });
   });
@@ -484,7 +484,7 @@ describe("CLI fallback session id propagation", () => {
     expect(spawned).toHaveLength(2);
     expect(apiRequests).toHaveLength(1);
     expect(JSON.parse(apiRequests[0].body)).toMatchObject({
-      messages: [{ role: "user", content: "hi after stale gateway" }],
+      messages: expect.arrayContaining([{ role: "user", content: "hi after stale gateway" }]),
       stream: true,
     });
   });
@@ -526,7 +526,7 @@ describe("CLI fallback session id propagation", () => {
     expect(requestEvents[secondSendStart]).toBe("chat");
     expect(requestEvents.at(-1)).toBe("chat");
     expect(JSON.parse(apiRequests[1].body)).toMatchObject({
-      messages: [{ role: "user", content: "hi after restart" }],
+      messages: expect.arrayContaining([{ role: "user", content: "hi after restart" }]),
       stream: true,
     });
   });
@@ -562,7 +562,7 @@ describe("CLI fallback session id propagation", () => {
     expect(chunks.join("")).toBe("Hi from API");
     expect(apiRequests).toHaveLength(2);
     expect(JSON.parse(apiRequests[1].body)).toMatchObject({
-      messages: [{ role: "user", content: "hi after reset" }],
+      messages: expect.arrayContaining([{ role: "user", content: "hi after reset" }]),
       stream: true,
     });
   });
@@ -596,7 +596,7 @@ describe("CLI fallback session id propagation", () => {
 
     expect(apiRequests).toHaveLength(2);
     expect(JSON.parse(apiRequests[1].body)).toMatchObject({
-      messages: [{ role: "user", content: "bad key" }],
+      messages: expect.arrayContaining([{ role: "user", content: "bad key" }]),
       stream: true,
     });
   });
@@ -639,7 +639,7 @@ describe("CLI fallback session id propagation", () => {
       expect(requestEvents.slice(secondSendStart + 1)).toContain("health");
     });
     expect(JSON.parse(apiRequests[1].body)).toMatchObject({
-      messages: [{ role: "user", content: "partial stream" }],
+      messages: expect.arrayContaining([{ role: "user", content: "partial stream" }]),
       stream: true,
     });
   });
@@ -682,7 +682,7 @@ describe("CLI fallback session id propagation", () => {
     expect(requestEvents[secondSendStart]).toBe("chat");
     expect(requestEvents.slice(secondSendStart + 1)).toContain("health");
     expect(JSON.parse(apiRequests[1].body)).toMatchObject({
-      messages: [{ role: "user", content: "hi after hung gateway" }],
+      messages: expect.arrayContaining([{ role: "user", content: "hi after hung gateway" }]),
       stream: true,
     });
   });

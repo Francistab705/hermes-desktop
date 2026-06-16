@@ -75,7 +75,7 @@ export const DataTable = defineComponent({
     rows: z.array(z.array(z.string())),
   }),
   component: ({ props: { columns, rows } }) => (
-    <div className="genui-table-wrap">
+    <div className="genui-table-wrap" role="region" aria-label="Data table" tabIndex={0}>
       <table className="genui-table">
         <thead>
           <tr>
@@ -127,7 +127,7 @@ export const FollowUps = defineComponent({
     const triggerAction = useTriggerAction();
 
     return (
-      <div className="genui-followups" aria-label="Suggested follow-ups">
+      <div className="genui-followups" role="group" aria-label="Suggested follow-ups">
         {prompts.map((prompt) => (
           <button
             className="genui-followup"

@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Pin } from "lucide-react";
 import icon from "../../assets/icon.png";
 import { AgentMarkdown } from "../../components/AgentMarkdown";
 import { AttachmentChip } from "../../components/AttachmentChip";
@@ -139,6 +140,8 @@ interface MessageRowProps {
   onDeny: () => void;
   /** Send a message into the chat pipeline (used by GenUI FollowUps/Form). */
   onSendMessage?: (text: string) => void;
+  /** Pin an OpenUI response to the Artifacts canvas. */
+  onPinArtifact?: (response: string) => void;
   /** False on continuation rows of a turn — render a spacer instead of the
    *  avatar so the turn reads as one grouped block. Defaults to true. */
   showAvatar?: boolean;
@@ -151,6 +154,7 @@ export const MessageRow = memo(function MessageRow({
   onApprove,
   onDeny,
   onSendMessage,
+  onPinArtifact,
   showAvatar = true,
 }: MessageRowProps): React.JSX.Element {
   const { t } = useI18n();
@@ -230,12 +234,25 @@ export const MessageRow = memo(function MessageRow({
         )}
         {msg.content &&
           (openUIResult ? (
-            <GenUIMessage
-              response={openUIResult.response}
-              isStreaming={openUIResult.isStreaming}
-              fallback={<AgentMarkdown>{msg.content}</AgentMarkdown>}
-              onSendMessage={onSendMessage}
-            />
+            <div className="genui-message-wrapper">
+              {onPinArtifact && !openUIResult.isStreaming && (
+                <button
+                  type="button"
+                  className="genui-pin-btn"
+                  onClick={() => onPinArtifact(openUIResult.response)}
+                  aria-label="Pin to artifact canvas"
+                >
+                  <Pin size={12} />
+                  Pin
+                </button>
+              )}
+              <GenUIMessage
+                response={openUIResult.response}
+                isStreaming={openUIResult.isStreaming}
+                fallback={<AgentMarkdown>{msg.content}</AgentMarkdown>}
+                onSendMessage={onSendMessage}
+              />
+            </div>
           ) : msg.role === "agent" && segments ? (
             segments.map((segment) =>
               segment.type === "text" ? (

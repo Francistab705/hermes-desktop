@@ -3503,7 +3503,8 @@ body {
 
 .genui-form-field input:focus {
   border-color: var(--border-focus);
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .genui-form-submit:disabled {
@@ -3568,6 +3569,121 @@ body {
 
 .genui-file-list code {
   color: var(--text-primary);
+}
+
+/* GenUI pin-to-canvas button on message bubbles */
+.genui-pin-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.genui-pin-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--bg-hover);
+}
+
+.genui-pin-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* Show pin button on hover over the GenUI wrapper */
+.genui-message-wrapper {
+  position: relative;
+}
+
+.genui-message-wrapper:hover .genui-pin-btn {
+  opacity: 1;
+}
+
+/* Artifacts Canvas — right-rail side panel */
+.artifacts-canvas {
+  border-left: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+  max-width: 50%;
+  width: 400px;
+  overflow: hidden;
+}
+
+.artifacts-canvas-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+
+.artifacts-canvas-title {
+  align-items: center;
+  color: var(--text-secondary);
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.artifacts-canvas-close {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  padding: 4px;
+}
+
+.artifacts-canvas-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.artifacts-canvas-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.artifacts-canvas-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+/* GenUI focus rings — visible keyboard focus for all interactive controls */
+.genui-followup:focus-visible,
+.genui-form-submit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* GenUI reduced motion — respect prefers-reduced-motion for any transitions */
+@media (prefers-reduced-motion: reduce) {
+  .genui-followup,
+  .genui-form-submit,
+  .genui-form-field input,
+  .genui-stat-tile,
+  .genui-tool-item {
+    transition: none !important;
+  }
 }
 
 /* Typing indicator */

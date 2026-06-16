@@ -24,6 +24,8 @@ interface MessageListProps {
   onClarifyResolved: (requestId: string, answer: string) => void;
   /** Send a message into the chat pipeline (used by GenUI FollowUps/Form). */
   onSendMessage?: (text: string) => void;
+  /** Pin an OpenUI response to the Artifacts canvas. */
+  onPinArtifact?: (response: string) => void;
 }
 
 function TypingIndicator({
@@ -69,6 +71,7 @@ export const MessageList = memo(function MessageList({
   onDeny,
   onClarifyResolved,
   onSendMessage,
+  onPinArtifact,
 }: MessageListProps): React.JSX.Element {
   // Bubbles with empty content are still hidden (live-stream placeholders).
   // History rows pass through unconditionally.
@@ -157,6 +160,7 @@ export const MessageList = memo(function MessageList({
         onApprove={onApprove}
         onDeny={onDeny}
         onSendMessage={onSendMessage}
+        onPinArtifact={onPinArtifact}
         showAvatar={showAvatar}
       />,
     );
