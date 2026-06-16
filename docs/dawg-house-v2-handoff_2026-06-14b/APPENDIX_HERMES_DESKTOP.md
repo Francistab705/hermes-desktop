@@ -1,4 +1,4 @@
-# Appendix — Evaluating `fathah/hermes-desktop` as the DAWG House v2 base
+# Appendix — Evaluating `fathah/hermes-desktop` as the SBC Tech v2 base
 
 > **Investigation only — no code changed.** Deep dive performed 2026-06-14 by
 > reading the v2 plan (`00`–`12`), the local upstream clone
@@ -47,7 +47,7 @@ so the plugin SDK doesn't save the feature you care most about.
   are the **model/provider** registry, not a UI plugin system.)
 - `package.json` has no plugin-SDK dependency.
 
-**Implication:** every DAWG delta (Workshop, PIV, Artifacts, KB, etc.) is added by
+**Implication:** every SBC Tech delta (Workshop, PIV, Artifacts, KB, etc.) is added by
 **editing the fork's source**, not by dropping in a plugin. This breaks Golden
 Rule #2's letter ("exactly one sanctioned fork") — in this base, the *whole repo*
 is your fork. That is normal for an app fork and fine for a personal build; just
@@ -73,7 +73,7 @@ screens/Chat/Chat.tsx           (orchestrator, ~22 KB)
   ```tsx
   // MessageRow.tsx — the one surgical branch
   import { Renderer, createLibrary } from "@openuidev/react-lang";
-  import * as genui from "../../components/genui"; // ported DAWG library
+  import * as genui from "../../components/genui"; // ported SBC Tech library
   const library = createLibrary(genui);
   const isOpenUI = (t: string) => /^\s*root\s*=/.test(t);
 
@@ -112,10 +112,10 @@ This single file is the strongest argument for choosing `hermes-desktop`.
 | # | Task | Where | Notes |
 |---|------|-------|-------|
 | 1 | `npm i @openuidev/react-lang` | `package.json` | confirm prop names vs installed version |
-| 2 | Port DAWG genui library → `src/renderer/src/components/genui/` | new dir | from `frontend/src/components/genui/` (Stack, ChartCard, DataTable, KPIRow, Callout, CodeBlock, Form, Timeline, PlanCard, FollowUps) |
+| 2 | Port SBC Tech genui library → `src/renderer/src/components/genui/` | new dir | from `frontend/src/components/genui/` (Stack, ChartCard, DataTable, KPIRow, Callout, CodeBlock, Form, Timeline, PlanCard, FollowUps) |
 | 3 | Add the `isOpenUI` branch | `screens/Chat/MessageRow.tsx` | the one detector + `Renderer` |
 | 4 | Wire interactive callbacks (submit-in-window) | copy `ClarifyCard.tsx` pattern | make `FollowUps`/`Form` dispatch into the send pipeline (Wibey) |
-| 5 | Theme the genui components to DAWG tokens | Tailwind 4 theme | reuse hermes-desktop's `ThemeProvider` |
+| 5 | Theme the genui components to SBC Tech tokens | Tailwind 4 theme | reuse hermes-desktop's `ThemeProvider` |
 | 6 | a11y pass (WCAG 2.2 AA) + streaming flicker test | Chat | partial-tree paint stability |
 
 **npm deps to add:** `@openuidev/react-lang` (+ whatever it peer-deps). Everything
@@ -183,7 +183,7 @@ Not something to treat as an upstream you blindly track.
 4. **OpenUI inline (the #1 goal):** add `@openuidev/react-lang`, port `genui/`,
    add the `isOpenUI` branch in `MessageRow.tsx`, and wire interactive callbacks by
    copying `ClarifyCard.tsx`. Ship the Wibey submit-in-window demo.
-5. **Re-skin** to DAWG tokens via the existing `ThemeProvider`/Tailwind theme.
+5. **Re-skin** to SBC Tech tokens via the existing `ThemeProvider`/Tailwind theme.
 6. **Then layer the remaining deltas as screens/components** (Artifacts shares the
    OpenUI renderer; PIV reuses upstream `checkpoint_manager`; Workshop reads
    `delegation.status`; KB; branching/tabs; CLI handoff). Each is a source edit, not

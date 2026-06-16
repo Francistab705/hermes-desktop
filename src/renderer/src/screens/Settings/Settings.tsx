@@ -12,10 +12,6 @@ import {
   FileText,
   Send,
 } from "lucide-react";
-import {
-  getAnalyticsConsent,
-  setAnalyticsConsent,
-} from "../../utils/analytics";
 import { ConfigHealth } from "./ConfigHealth";
 
 const DISCORD_COMMUNITY_URL = "https://discord.gg/vMwcnNPHc";
@@ -207,10 +203,6 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
   const [dumpOutput, setDumpOutput] = useState<string | null>(null);
   const [dumpRunning, setDumpRunning] = useState(false);
 
-  // Analytics consent
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(() =>
-    getAnalyticsConsent(),
-  );
   const loadConfigRequestRef = useRef(0);
 
   const loadConfig = useCallback(async (): Promise<void> => {
@@ -1288,45 +1280,6 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
           <div className="settings-field-hint">
             {t("settings.language.hint")}
           </div>
-        </div>
-      </div>
-
-      <div className="settings-section">
-        <div className="settings-section-title">
-          {t("settings.sections.privacy")}
-        </div>
-        <div className="settings-field">
-          <label className="settings-field-label">
-            {t("settings.analytics.label")}
-            <label
-              className="tools-toggle"
-              style={{ marginLeft: 12, verticalAlign: "middle" }}
-            >
-              <input
-                type="checkbox"
-                checked={analyticsEnabled}
-                onChange={(e) => {
-                  const enabled = e.target.checked;
-                  setAnalyticsEnabled(enabled);
-                  setAnalyticsConsent(enabled);
-                }}
-              />
-              <span className="tools-toggle-track" />
-            </label>
-          </label>
-          <div className="settings-field-hint">
-            {t("settings.analytics.hint")}
-          </div>
-          <ul
-            className="settings-field-hint"
-            style={{ paddingLeft: "1.25em", marginTop: 4 }}
-          >
-            <li>{t("settings.analytics.disclosure.uuid")}</li>
-            <li>{t("settings.analytics.disclosure.platform")}</li>
-            <li>{t("settings.analytics.disclosure.navigation")}</li>
-            <li>{t("settings.analytics.disclosure.endpoint")}</li>
-            <li>{t("settings.analytics.disclosure.notCollected")}</li>
-          </ul>
         </div>
       </div>
 

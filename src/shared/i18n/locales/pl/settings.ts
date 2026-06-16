@@ -24,14 +24,14 @@ export default {
   },
   analytics: {
     label: "Wysyłaj anonimową analitykę użycia",
-    hint: "Pomaga ulepszać Hermes One przez wysyłanie anonimowych, zagregowanych danych użycia do instancji PostHog projektu. Możesz to wyłączyć w dowolnym momencie.",
+    hint: "Analytics are disabled in the SBC Tech fork.",
     disclosure: {
       uuid: "Losowy identyfikator instalacji przechowywany tylko na tym urządzeniu (bez imienia, e-maila ani danych konta).",
       platform: "Twój system operacyjny, wersja Electron i wersja Node.js.",
       navigation:
         "Ekrany odwiedzane w aplikacji (np. Czat, Sesje, Ustawienia). Nie zbieramy treści czatu, promptów, odpowiedzi modeli ani zawartości plików.",
       endpoint:
-        "Dane są wysyłane do us.i.posthog.com (chmura PostHog US). Nagrywanie sesji i automatyczne przechwytywanie odsłon są wyłączone.",
+        "No analytics endpoint is configured in the SBC Tech fork.",
       notCollected:
         "Nigdy nie zbieramy: wiadomości czatu, ścieżek plików, kluczy API, konfiguracji modeli, poświadczeń kont.",
     },

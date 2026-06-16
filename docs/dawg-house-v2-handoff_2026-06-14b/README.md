@@ -1,6 +1,6 @@
-# DAWG House v2 — Handoff Doc Set
+# SBC Tech v2 — Handoff Doc Set
 
-Build DAWG House v2 as a **fork of `fathah/hermes-desktop`** (Electron desktop GUI
+Build SBC Tech v2 as a **fork of `fathah/hermes-desktop`** (Electron desktop GUI
 for the same NousResearch/hermes-agent) + 12 added features. **Start with
 `00_OVERVIEW.md`** — it defines the rules, the phases, and what we inherit for free.
 Then work the feature docs in phase order.

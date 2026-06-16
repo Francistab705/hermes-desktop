@@ -1,4 +1,4 @@
-# DAWG House v2 Phase 0 + Phase 1 Start Plan
+# SBC Tech v2 Phase 0 + Phase 1 Start Plan
 
 Source docs:
 
@@ -11,7 +11,7 @@ Source docs:
 
 This plan covers only the MVP path:
 
-- Phase 0: foundation fork, boot, telemetry removal, DAWG marker, DAWG theme.
+- Phase 0: foundation fork, boot, telemetry removal, SBC Tech marker, SBC Tech theme.
 - Phase 1: OpenUI generation + inline rendering + interactions + Artifacts canvas.
 
 Do not plan or start phases 2-6 until Phase 0 and Phase 1 are usable as a daily-driver MVP.
@@ -31,22 +31,31 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - Use GSD/TDD for Phase 1 if the OpenUI renderer + Artifacts work becomes stateful across several files.
 - Do not use BMad unless the product direction changes and planning needs to restart.
 
+## Pinned Fork Base
+
+- Recorded: 2026-06-15
+- Working branch: `main`
+- Fork remote: `origin` -> `https://github.com/Francistab705/hermes-desktop.git`
+- Upstream remote: `upstream` -> `https://github.com/fathah/hermes-desktop.git`
+- SBC Tech Phase 0 base commit: `7defcaa01b6adb277967ae88262f0755d3b8029b`
+- Base note: this commit adds the SBC Tech planning docs on top of the inherited `hermes-desktop` fork state. Treat it as the reproducible starting point for Phase 0 changes.
+
 ## Issue 1: Pin The Fork And Record The Base
 
-Goal: make the repo a known, reproducible DAWG House base instead of a moving upstream target.
+Goal: make the repo a known, reproducible SBC Tech base instead of a moving upstream target.
 
 Work:
 
 - Confirm the current remote/fork state.
 - Add or verify `upstream` points to `fathah/hermes-desktop`.
 - Record the pinned upstream commit in a small repo note, ADR, or this plan.
-- Confirm the working branch name for DAWG House v2.
+- Confirm the working branch name for SBC Tech v2.
 
 Acceptance criteria:
 
 - The repo has a clear upstream remote.
 - The base commit is recorded.
-- Future agents can tell what upstream state DAWG House started from.
+- Future agents can tell what upstream state SBC Tech started from.
 
 Suggested verification:
 
@@ -56,7 +65,7 @@ Suggested verification:
 
 ## Issue 2: Boot The Existing Desktop App On macOS
 
-Goal: prove the inherited chassis works before DAWG changes begin.
+Goal: prove the inherited chassis works before SBC Tech changes begin.
 
 Work:
 
@@ -102,14 +111,14 @@ Suggested verification:
 - `npm run typecheck`
 - `npm run test`
 
-## Issue 4: Prove The Source-Edit Loop With A DAWG Marker
+## Issue 4: Prove The Source-Edit Loop With An SBC Tech Marker
 
-Goal: make the smallest visible DAWG source change before deeper work.
+Goal: make the smallest visible SBC Tech source change before deeper work.
 
 Work:
 
 - Find the header/top-level chat or app shell component.
-- Add a small DAWG House marker in the app chrome.
+- Add a small SBC Tech marker in the app chrome.
 - Keep the change minimal and easy to remove or restyle later.
 
 Acceptance criteria:
@@ -123,20 +132,20 @@ Suggested verification:
 - `npm run dev`
 - `npm run typecheck`
 
-## Issue 5: Add The DAWG Theme Through Tokens
+## Issue 5: Add The SBC Tech Theme Through Tokens
 
 Goal: re-skin through existing theming infrastructure, not one-off component styles.
 
 Work:
 
-- Add a DAWG theme entry in the existing theme constants.
+- Add an SBC Tech theme entry in the existing theme constants.
 - Prefer CSS variables/theme tokens consumed by existing components.
-- Make the DAWG theme selectable or default for the DAWG branch.
+- Make the SBC Tech theme selectable or default for the SBC Tech branch.
 - Avoid hard-coded colors inside individual components.
 
 Acceptance criteria:
 
-- DAWG theme applies through `ThemeProvider` / `data-theme`.
+- SBC Tech theme applies through `ThemeProvider` / `data-theme`.
 - Existing screens still render legibly.
 - Contrast meets WCAG 2.2 AA for normal text and controls.
 
@@ -170,7 +179,7 @@ Suggested verification:
 - `npm run typecheck`
 - `npm run test -- isOpenUI` if a focused test exists.
 
-## Issue 7: Port The Minimal DAWG GenUI Component Library
+## Issue 7: Port The Minimal SBC Tech GenUI Component Library
 
 Goal: provide enough registered components for a useful OpenUI MVP without over-porting.
 
@@ -180,7 +189,7 @@ Work:
 - Start with the smallest MVP set: `Stack`, `Callout`, `KPIRow`, `StatTile`, `DataTable`, `FollowUps`, `Form`, `PlanCard`.
 - Add `ChartCard`, `Timeline`, and `CodeBlock` only if the source components are ready and compile cleanly.
 - Register components through `createLibrary` in one place.
-- Style with DAWG/theme tokens rather than copied hard-coded V1 colors.
+- Style with SBC Tech/theme tokens rather than copied hard-coded V1 colors.
 
 Acceptance criteria:
 
@@ -199,15 +208,15 @@ Goal: make generation work, not just rendering.
 
 Work:
 
-- Create an always-on OpenUI context file for the DAWG Hermes profile.
+- Create an always-on OpenUI context file for the SBC Tech Hermes profile.
 - Include the OpenUI quick reference: `root =` first-token rule, positional args rule, never mix markdown and OpenUI.
-- Include DAWG component signatures.
+- Include SBC Tech component signatures.
 - Include guidance for when to emit OpenUI versus markdown.
 - Prefer generating the signature block from the registered library if `@openuidev/react-lang` supports prompt generation from the library.
 
 Acceptance criteria:
 
-- The context file is mounted for the DAWG profile.
+- The context file is mounted for the SBC Tech profile.
 - A UI-shaped prompt causes the agent to emit a response beginning with `root =`.
 - Normal prose prompts still produce markdown/plain text.
 - The context source of truth is documented.
@@ -320,11 +329,11 @@ Suggested verification:
 
 ## MVP Exit Criteria
 
-DAWG House v2 is ready to move beyond the MVP queue when all of these are true:
+SBC Tech v2 is ready to move beyond the MVP queue when all of these are true:
 
 - The app boots on macOS from this fork.
 - Telemetry is removed.
-- The DAWG marker and DAWG theme are visible.
+- The SBC Tech marker and SBC Tech theme are visible.
 - The agent can emit OpenUI Lang from the always-on context file.
 - Chat renders OpenUI inline when content starts with `root =`.
 - Markdown fallback is unchanged.

@@ -480,15 +480,18 @@ function Layout({
     <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span
-            className="sidebar-logo"
-            role="img"
-            aria-label="Hermes"
-            style={{
-              maskImage: `url(${hermeslogo})`,
-              WebkitMaskImage: `url(${hermeslogo})`,
-            }}
-          />
+          <span className="sidebar-brand-lockup">
+            <span
+              className="sidebar-logo"
+              role="img"
+              aria-label="Hermes"
+              style={{
+                maskImage: `url(${hermeslogo})`,
+                WebkitMaskImage: `url(${hermeslogo})`,
+              }}
+            />
+            <span className="sidebar-brand-marker">SBC Tech</span>
+          </span>
           <button
             className="sidebar-collapse-toggle"
             type="button"

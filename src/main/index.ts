@@ -2783,18 +2783,19 @@ app.whenReady().then(() => {
     (_wc, permission) => permission === "media",
   );
 
-  // In production, inject PostHog domains into the CSP response header.
+  // In production, set a renderer CSP response header.
   // Skipped in dev — Vite manages its own CSP headers with nonces for
   // Fast Refresh inline scripts; overriding them breaks the dev server.
   if (!is.dev) {
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       const csp =
         "default-src 'self'; " +
-        "script-src 'self' 'wasm-unsafe-eval' https://*.posthog.com https://*.i.posthog.com; " +
+        "script-src 'self' 'wasm-unsafe-eval'; " +
         "style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: blob:; " +
-        "connect-src 'self' blob: https://*.posthog.com https://*.i.posthog.com; " +
-        "media-src 'self' blob:";
+        "connect-src 'self' blob:; " +
+        "media-src 'self' blob:; " +
+        "worker-src 'self' blob:";
       callback({
         responseHeaders: {
           ...details.responseHeaders,

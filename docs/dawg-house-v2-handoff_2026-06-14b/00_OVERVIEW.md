@@ -1,6 +1,6 @@
-# DAWG House v2 — Build Overview & Handoff Master
+# SBC Tech v2 — Build Overview & Handoff Master
 
-> **Audience:** the laptop-agent (and future Francis) building DAWG House v2.
+> **Audience:** the laptop-agent (and future Francis) building SBC Tech v2.
 > **Read this first.** Every other doc (`01..12`) is a single feature and assumes
 > the rules, vocabulary, and phase order defined here.
 
@@ -17,13 +17,13 @@
 
 ## 1. What we are building (one paragraph)
 
-DAWG House v2 is a **fork of `fathah/hermes-desktop`** (MIT — an Electron desktop
+SBC Tech v2 is a **fork of `fathah/hermes-desktop`** (MIT — an Electron desktop
 app that installs, configures, and chats with **NousResearch/hermes-agent**; local
 agent clone at `C:\Users\maf001h\Desktop\apps\_clones\hermes-agent`). We inherit
 hermes-desktop's polished chassis for free (~90% of the surface — installer,
 sessions, memory+providers, models, schedules, gateways, token footer), then add
 **12 features** as **screen/component modules in the fork** plus the **OpenUI
-renderer change** in the chat path — re-skin to the DAWG House theme, and polish to
+renderer change** in the chat path — re-skin to the SBC Tech theme, and polish to
 the "Wibey" smoothness bar. We do **not** rebuild the agent: orchestration, models,
 MCP, cron, skills, memory, or the multi-platform gateway all come from the upstream
 hermes-agent (reached via the desktop app's main-process API / IPC + the agent's
@@ -34,7 +34,7 @@ like Wibey (no modal gauntlets, no reloads, instant feedback) and renders rich
 generative UI inline via OpenUI.
 
 > **🎯 v2.0 MVP (the only thing that defines "done enough to switch to daily"):**
-> **Phase 0 + Phase 1** — the fork boots on Mac, DAWG-skinned, and the chat
+> **Phase 0 + Phase 1** — the fork boots on Mac, SBC Tech-skinned, and the chat
 > **generates + renders + interacts with OpenUI inline like Wibey.** That's it.
 > The other 10 features (Phases 2–6) are an explicit **post-MVP backlog** — add
 > them when you feel the itch, not before. v2 is a **personal** app (hermes-agent
@@ -53,7 +53,7 @@ generative UI inline via OpenUI.
 | 4 | **Reuse Hermes primitives — no parallel systems.** PIV + Workflows reuse `checkpoint_manager`; Memory reuses the Hermes store + `session_search`; Workshop reuses `delegation.status`. | DRY. The whole thesis of v2. |
 | 5 | **One OpenUI renderer, two mount points.** Inline-in-chat (`01`) and the Artifacts side canvas (`09`) share `@openuidev/react-lang`. Not two engines. | DRY. |
 | 6 | **WCAG 2.2 AA on every surface** — icon-only buttons get `aria-label`, animations respect `prefers-reduced-motion`. | Non-negotiable. |
-| 7 | **Personal project.** This is NOT Walmart infra → the Element Gateway / LLM-boundary rule does **not** apply. Bring-your-own-model freely (ChatGPT sub + Anthropic API + opencode providers). | Removes a constraint that applies to the *other* DAWG House. |
+| 7 | **Personal project.** This is NOT Walmart infra → the Element Gateway / LLM-boundary rule does **not** apply. Bring-your-own-model freely (ChatGPT sub + Anthropic API + opencode providers). | Removes a constraint that applies to the *other* SBC Tech work. |
 
 ---
 
@@ -119,7 +119,7 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 
 | Phase | Build | Delivers |
 |-------|-------|----------|
-| **0 — Foundation** 🎯MVP | Fork `hermes-desktop` + pin + strip telemetry + boot `electron-vite dev` + hello-component + DAWG skin | A working DAWG-skinned desktop app (loop proven) |
+| **0 — Foundation** 🎯MVP | Fork `hermes-desktop` + pin + strip telemetry + boot `electron-vite dev` + hello-component + SBC Tech skin | A working SBC Tech-skinned desktop app (loop proven) |
 | **1 — Signature** 🎯MVP | OpenUI inline ① (generate + render) + Artifacts ⑨ | Generative UI, one renderer, two mounts |
 | **2 — Cockpit** | Workshop ② (read-only) + token pill ④ | Watch the orchestrator |
 | **3 — Workbench DNA** | Branching ③ + PIV ⑤ | Fork timelines + structured plans |
@@ -139,13 +139,13 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 | 0.1 | Fork `fathah/hermes-desktop`, clone, set `upstream`, **pin a commit** (don't track `main`) | You own a pinned fork, not a moving target |
 | 0.2 | `npm install` → `npm run dev` (electron-vite). Confirm chat works against a local/remote hermes-agent | Inherited chassis runs as-is |
 | 0.3 | **Strip `posthog-js`** telemetry; optionally delete the `Office` (three.js) screen + deps | De-baggaged, slimmer bundle |
-| 0.4 | Smallest source edit: render a 🐶 DAWG marker in the header component | The source-edit loop works → every later feature attaches the same way |
-| 0.5 | Re-skin via `ThemeProvider` + Tailwind theme tokens | DAWG skin = theme tokens, not hand-edits |
+| 0.4 | Smallest source edit: render an SBC Tech marker in the header component | The source-edit loop works → every later feature attaches the same way |
+| 0.5 | Re-skin via `ThemeProvider` + Tailwind theme tokens | SBC Tech skin = theme tokens, not hand-edits |
 | 0.6 | Verify all green, then `git commit` the pinned fork + marker + skin | Foundation loop is reproducible + pinned |
 
 **Exit criteria (all green):** ✅ pinned fork of hermes-desktop boots via
-`electron-vite dev` · ✅ telemetry stripped · ✅ DAWG marker renders (source-edit
-loop proven) · ✅ DAWG skin applies via theme tokens · ✅ committed. Hit them all →
+`electron-vite dev` · ✅ telemetry stripped · ✅ SBC Tech marker renders (source-edit
+loop proven) · ✅ SBC Tech skin applies via theme tokens · ✅ committed. Hit them all →
 start Phase 1.
 
 > **No plugin seam here** — unlike the old `web/` plan, the "hello" proof is a

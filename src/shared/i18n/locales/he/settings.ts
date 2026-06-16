@@ -35,14 +35,14 @@ export default {
   },
   analytics: {
     label: "שליחת נתוני שימוש אנונימיים",
-    hint: "עוזר לשפר את Hermes Desktop באמצעות שליחת נתוני שימוש אנונימיים ומצרפיים למופע ה-PostHog של הפרויקט. ניתן לכבות זאת בכל עת.",
+    hint: "Analytics are disabled in the SBC Tech fork.",
     disclosure: {
       uuid: "מזהה אקראי לכל התקנה, השמור רק במכשיר זה (ללא שם, אימייל או פרטי חשבון).",
       platform: "מערכת ההפעלה שלכם, גרסת Electron וגרסת Node.js.",
       navigation:
         "אילו מסכים אתם מבקרים בתוך האפליקציה (לדוגמה, צ'אט, סשנים, הגדרות). לא נאסף תוכן צ'אט, הנחיות, תגובות מודל או תוכן קבצים.",
       endpoint:
-        "הנתונים נשלחים אל us.i.posthog.com (ענן PostHog בארה\"ב). הקלטות סשן ולכידה אוטומטית של צפיות בדפים מושבתות.",
+        "No analytics endpoint is configured in the SBC Tech fork.",
       notCollected:
         "לעולם לא נאסף: הודעות צ'אט, נתיבי קבצים, מפתחות API, הגדרות מודל, אישורי חשבון.",
     },
