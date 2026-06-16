@@ -52,10 +52,12 @@ function GenUIMessage({
   response,
   isStreaming,
   fallback,
+  onSendMessage,
 }: {
   response: string;
   isStreaming: boolean;
   fallback: ReactNode;
+  onSendMessage?: (text: string) => void;
 }): React.JSX.Element {
   const [hasError, setHasError] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -80,6 +82,11 @@ function GenUIMessage({
         <OpenUIRenderer
           response={response}
           isStreaming={isStreaming}
+          onAction={(event) => {
+            if (onSendMessage && event.humanFriendlyMessage) {
+              onSendMessage(event.humanFriendlyMessage);
+            }
+          }}
           onError={(errors) => {
             // Suppress errors during streaming — partial trees produce
             // transient parse failures that resolve as more tokens arrive.
@@ -130,6 +137,8 @@ interface MessageRowProps {
   isLoading: boolean;
   onApprove: () => void;
   onDeny: () => void;
+  /** Send a message into the chat pipeline (used by GenUI FollowUps/Form). */
+  onSendMessage?: (text: string) => void;
   /** False on continuation rows of a turn — render a spacer instead of the
    *  avatar so the turn reads as one grouped block. Defaults to true. */
   showAvatar?: boolean;
@@ -141,6 +150,7 @@ export const MessageRow = memo(function MessageRow({
   isLoading,
   onApprove,
   onDeny,
+  onSendMessage,
   showAvatar = true,
 }: MessageRowProps): React.JSX.Element {
   const { t } = useI18n();
@@ -224,6 +234,7 @@ export const MessageRow = memo(function MessageRow({
               response={openUIResult.response}
               isStreaming={openUIResult.isStreaming}
               fallback={<AgentMarkdown>{msg.content}</AgentMarkdown>}
+              onSendMessage={onSendMessage}
             />
           ) : msg.role === "agent" && segments ? (
             segments.map((segment) =>

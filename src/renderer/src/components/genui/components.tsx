@@ -145,27 +145,47 @@ export const FollowUps = defineComponent({
 
 export const Form = defineComponent({
   name: "Form",
-  description: "Renders a simple labeled text-input form for future chat submission.",
+  description: "Renders a simple labeled text-input form for chat submission.",
   props: z.object({
     title: z.string(),
     fields: z.array(z.string()),
   }),
-  component: ({ props: { title, fields } }) => (
-    <form className="genui-form" aria-label={title}>
-      <h3 className="genui-form-title">{title}</h3>
-      <div className="genui-form-fields">
-        {fields.map((field) => (
-          <label className="genui-form-field" key={field}>
-            <span>{field}</span>
-            <input name={field} type="text" />
-          </label>
-        ))}
-      </div>
-      <button className="genui-form-submit" disabled type="submit">
-        Submit {title}
-      </button>
-    </form>
-  ),
+  component: ({ props: { title, fields } }) => {
+    const triggerAction = useTriggerAction();
+
+    return (
+      <form
+        className="genui-form"
+        aria-label={title}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          const entries = fields
+            .map((field) => {
+              const value = (formData.get(field) as string | null)?.trim();
+              return value ? `${field}: ${value}` : null;
+            })
+            .filter(Boolean);
+          if (entries.length > 0) {
+            void triggerAction(`[${title}] ${entries.join(", ")}`);
+          }
+        }}
+      >
+        <h3 className="genui-form-title">{title}</h3>
+        <div className="genui-form-fields">
+          {fields.map((field) => (
+            <label className="genui-form-field" key={field}>
+              <span>{field}</span>
+              <input name={field} type="text" />
+            </label>
+          ))}
+        </div>
+        <button className="genui-form-submit" type="submit">
+          Submit {title}
+        </button>
+      </form>
+    );
+  },
 });
 
 export const AgentStatus = defineComponent({

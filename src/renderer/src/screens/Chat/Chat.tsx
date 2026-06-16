@@ -433,6 +433,14 @@ function Chat({
     handleSendRef.current = actions.handleSend;
   });
 
+  // Stable callback for GenUI interactions (FollowUps, Form submit).
+  // Uses the ref so identity never changes and memoized MessageList/
+  // MessageRow children don't re-render on every streaming chunk.
+  const handleGenUISend = useCallback(
+    (text: string) => void handleSendRef.current(text),
+    [],
+  );
+
   // Drain queued messages one at a time when the agent finishes.
   useEffect(() => {
     if (isLoading) return;
@@ -559,6 +567,7 @@ function Chat({
               onApprove={actions.handleApprove}
               onDeny={actions.handleDeny}
               onClarifyResolved={handleClarifyResolved}
+              onSendMessage={handleGenUISend}
             />
           )}
           <div ref={bottomRef} />

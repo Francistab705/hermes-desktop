@@ -1105,8 +1105,8 @@ Available OpenUI components:
 - KPIRow(tiles)
 - DataTable(columns, rows)
 - PlanCard(title, steps)
-- FollowUps(prompts) - visual only for now
-- Form(title, fields) - disabled/read-only for now
+- FollowUps(prompts) - clicking sends the prompt as a new chat message
+- Form(title, fields) - submitting sends field values as a new chat message
 - AgentStatus(phase, status, detail?)
 - RiskList(title, risks)
 - ToolSummary(title, tools) where tools is [{ name, outcome }]

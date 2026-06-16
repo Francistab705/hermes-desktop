@@ -48,7 +48,7 @@ form = Form("Intake", ["Company", "Priority"])`}
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Company")).toBeInTheDocument();
     expect(screen.getByLabelText("Priority")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Submit Intake" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Submit Intake" })).toBeEnabled();
   });
 
   it("renders Hermes-specific work summary components", async () => {

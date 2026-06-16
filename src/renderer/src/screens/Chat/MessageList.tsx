@@ -22,6 +22,8 @@ interface MessageListProps {
   onDeny: () => void;
   /** Mark an inline clarify card resolved once the user answers/skips. */
   onClarifyResolved: (requestId: string, answer: string) => void;
+  /** Send a message into the chat pipeline (used by GenUI FollowUps/Form). */
+  onSendMessage?: (text: string) => void;
 }
 
 function TypingIndicator({
@@ -66,6 +68,7 @@ export const MessageList = memo(function MessageList({
   onApprove,
   onDeny,
   onClarifyResolved,
+  onSendMessage,
 }: MessageListProps): React.JSX.Element {
   // Bubbles with empty content are still hidden (live-stream placeholders).
   // History rows pass through unconditionally.
@@ -153,6 +156,7 @@ export const MessageList = memo(function MessageList({
         isLoading={isLoading}
         onApprove={onApprove}
         onDeny={onDeny}
+        onSendMessage={onSendMessage}
         showAvatar={showAvatar}
       />,
     );
