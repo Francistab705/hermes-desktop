@@ -1,7 +1,20 @@
-import { memo, useMemo } from "react";
+import {
+  Component,
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import icon from "../../assets/icon.png";
 import { AgentMarkdown } from "../../components/AgentMarkdown";
 import { AttachmentChip } from "../../components/AttachmentChip";
+import {
+  getStreamingOpenUIResponse,
+  OpenUIRenderer,
+  type StreamingOpenUIResult,
+} from "../../components/genui";
 import { MediaSegmentView } from "../../components/MediaImage";
 import { useI18n } from "../../components/useI18n";
 import { parseMediaTokens, cleanLeakedToolTags } from "./mediaUtils";
@@ -9,6 +22,77 @@ import type { ChatBubbleMessage, ChatMessage } from "./types";
 
 export const APPROVAL_RE =
   /⚠️.*dangerous|requires? (your )?approval|\/approve.*\/deny|do you want (me )?to (proceed|continue|run|execute)/i;
+
+interface GenUIBoundaryProps {
+  fallback: ReactNode;
+  children: ReactNode;
+}
+
+interface GenUIBoundaryState {
+  hasError: boolean;
+}
+
+class GenUIBoundary extends Component<GenUIBoundaryProps, GenUIBoundaryState> {
+  state: GenUIBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): GenUIBoundaryState {
+    return { hasError: true };
+  }
+
+  override componentDidCatch(error: unknown): void {
+    console.error("Failed to render OpenUI response", error);
+  }
+
+  override render(): ReactNode {
+    return this.state.hasError ? this.props.fallback : this.props.children;
+  }
+}
+
+function GenUIMessage({
+  response,
+  isStreaming,
+  fallback,
+}: {
+  response: string;
+  isStreaming: boolean;
+  fallback: ReactNode;
+}): React.JSX.Element {
+  const [hasError, setHasError] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [response]);
+
+  // Only trigger error fallback when streaming is done — partial trees
+  // are expected to be incomplete / empty during streaming.
+  useEffect(() => {
+    if (isStreaming || hasError) return;
+    if (!contentRef.current) return;
+    if (contentRef.current.childElementCount === 0) setHasError(true);
+  }, [hasError, isStreaming, response]);
+
+  if (hasError) return <>{fallback}</>;
+
+  return (
+    <GenUIBoundary fallback={fallback}>
+      <div ref={contentRef}>
+        <OpenUIRenderer
+          response={response}
+          isStreaming={isStreaming}
+          onError={(errors) => {
+            // Suppress errors during streaming — partial trees produce
+            // transient parse failures that resolve as more tokens arrive.
+            if (!isStreaming && errors.length > 0) setHasError(true);
+          }}
+          onParseResult={(result) => {
+            if (!isStreaming && !result?.root) setHasError(true);
+          }}
+        />
+      </div>
+    </GenUIBoundary>
+  );
+}
 
 function isChatBubbleMessage(msg: ChatMessage): msg is ChatBubbleMessage {
   return (
@@ -71,14 +155,22 @@ export const MessageRow = memo(function MessageRow({
   const bubbleContent = isChatBubbleMessage(msg)
     ? (msg as ChatBubbleMessage).content
     : null;
-  const segments = useMemo(
+  const isPending = isChatBubbleMessage(msg) && !!(msg as ChatBubbleMessage).pending;
+  const openUIResult: StreamingOpenUIResult | null = useMemo(
     () =>
       msg.role === "agent" && bubbleContent
+        ? getStreamingOpenUIResponse(bubbleContent, isPending)
+        : null,
+    [msg.role, bubbleContent, isPending],
+  );
+  const segments = useMemo(
+    () =>
+      msg.role === "agent" && bubbleContent && !openUIResult
         ? // Recover any tool/skill call the model leaked as text (e.g. a raw
           // `<skill_view>{"answer": …}</skill_view>` tag) before tokenizing.
           parseMediaTokens(cleanLeakedToolTags(bubbleContent))
         : null,
-    [msg.role, bubbleContent],
+    [msg.role, bubbleContent, openUIResult],
   );
 
   // Only chat bubble messages have content/attachments
@@ -127,29 +219,37 @@ export const MessageRow = memo(function MessageRow({
           </div>
         )}
         {msg.content &&
-          (msg.role === "agent" && segments
-            ? segments.map((segment) =>
-                segment.type === "text" ? (
-                  segment.value.trim() ? (
-                    // Keyed on the segment's character offset rather than its
-                    // array index — a MEDIA: token appearing mid-stream shifts
-                    // every subsequent index, which would otherwise re-mount
-                    // each downstream MediaSegmentView and re-fire its
-                    // `mediaFileExists` probe.
-                    <AgentMarkdown key={`t-${segment.start}`}>
-                      {segment.value}
-                    </AgentMarkdown>
-                  ) : null
-                ) : (
-                  <MediaSegmentView
-                    key={`m-${segment.start}`}
-                    token={segment.token}
-                    raw={segment.raw}
-                    source={segment.source}
-                  />
-                ),
-              )
-            : msg.content)}
+          (openUIResult ? (
+            <GenUIMessage
+              response={openUIResult.response}
+              isStreaming={openUIResult.isStreaming}
+              fallback={<AgentMarkdown>{msg.content}</AgentMarkdown>}
+            />
+          ) : msg.role === "agent" && segments ? (
+            segments.map((segment) =>
+              segment.type === "text" ? (
+                segment.value.trim() ? (
+                  // Keyed on the segment's character offset rather than its
+                  // array index — a MEDIA: token appearing mid-stream shifts
+                  // every subsequent index, which would otherwise re-mount
+                  // each downstream MediaSegmentView and re-fire its
+                  // `mediaFileExists` probe.
+                  <AgentMarkdown key={`t-${segment.start}`}>
+                    {segment.value}
+                  </AgentMarkdown>
+                ) : null
+              ) : (
+                <MediaSegmentView
+                  key={`m-${segment.start}`}
+                  token={segment.token}
+                  raw={segment.raw}
+                  source={segment.source}
+                />
+              ),
+            )
+          ) : (
+            msg.content
+          ))}
         {msg.error && (
           <div className="chat-error-message" role="alert">
             {msg.error}

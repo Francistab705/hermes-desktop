@@ -219,7 +219,7 @@ import {
   removeMemoryEntry,
   writeUserProfile,
 } from "./memory";
-import { readSoul, writeSoul, resetSoul } from "./soul";
+import { readSoul, writeSoul, resetSoul, ensureOpenUIGuidanceInSoul } from "./soul";
 import {
   getPlatformToolsets,
   getToolsets,
@@ -2817,6 +2817,7 @@ app.whenReady().then(() => {
 
   buildMenu();
   setupIPC();
+  ensureOpenUIGuidanceInSoul();
   createWindow();
   setupUpdater();
 

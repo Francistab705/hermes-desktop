@@ -149,6 +149,32 @@ describe("sendMessageViaApi forwards resumeSessionId", () => {
     expect(parsed.session_id).toBe(testSessionId);
   });
 
+  it("includes OpenUI generation guidance as the first system message", async () => {
+    await sendMessage(
+      "show a work summary UI",
+      {
+        onChunk: () => {},
+        onDone: () => {},
+        onError: () => {},
+      },
+      "default",
+      undefined,
+    );
+
+    const chatRequest = capturedRequests.find((r) =>
+      r.url.includes("/v1/chat/completions"),
+    );
+    expect(chatRequest).toBeDefined();
+    const parsed = JSON.parse(chatRequest!.body);
+
+    expect(parsed.messages[0].role).toBe("system");
+    expect(parsed.messages[0].content).toContain("OpenUI contract");
+    expect(parsed.messages[0].content).toContain("never JSX");
+    expect(parsed.messages[0].content).toContain("Never output raw HTML");
+    expect(parsed.messages[0].content).toContain("fall back to plain markdown rather than HTML/CSS");
+    expect(parsed.messages[0].content).toContain("AgentStatus(phase, status, detail?)");
+  });
+
   it("does not include session_id field when resumeSessionId is absent", async () => {
     await sendMessage(
       "hello",

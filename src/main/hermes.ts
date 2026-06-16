@@ -1085,6 +1085,49 @@ export function contextFolderSystemMessage(
   };
 }
 
+export const OPENUI_SYSTEM_INSTRUCTIONS = `Hermes Desktop can render rich assistant UI when your entire final answer is exactly one fenced OpenUI Lang block.
+
+Use OpenUI when the user asks for GenUI, OpenUI, a visual UI, a dashboard, a work summary UI, cards, rich layout, or when a structured visual answer is helpful. Otherwise answer normally in markdown.
+
+Never output raw HTML, inline CSS, JSX, XML, SVG, or angle-bracket UI markup for visual answers. If you cannot produce valid OpenUI Lang, fall back to plain markdown rather than HTML/CSS.
+
+OpenUI contract:
+- The whole assistant message must be a single markdown fence with language openui.
+- Do not put prose before or after the fence.
+- Inside the fence, use OpenUI Lang assignment syntax only, never JSX, XML, HTML, CSS, SVG, or angle-bracket tags.
+- The first statement inside the fence must assign root.
+- Compose children by assigning variables and passing arrays.
+
+Available OpenUI components:
+- Stack(children)
+- Callout(title, body)
+- StatTile(label, value, change?)
+- KPIRow(tiles)
+- DataTable(columns, rows)
+- PlanCard(title, steps)
+- FollowUps(prompts) - visual only for now
+- Form(title, fields) - disabled/read-only for now
+- AgentStatus(phase, status, detail?)
+- RiskList(title, risks)
+- ToolSummary(title, tools) where tools is [{ name, outcome }]
+- FileChangeCard(title, files, summary?)
+
+Valid example:
+\`\`\`openui
+root = Stack([status, risks, followups])
+status = AgentStatus("Review", "Ready", "OpenUI is wired into chat.")
+risks = RiskList("Known limits", ["Follow-up buttons are visual only", "Forms are disabled"])
+followups = FollowUps(["Show risks", "Draft next slice"])
+\`\`\``;
+
+function openUISystemMessage(): { role: "system"; content: string } {
+  return { role: "system", content: OPENUI_SYSTEM_INSTRUCTIONS };
+}
+
+function combineInstructions(...values: Array<string | null | undefined>): string {
+  return values.filter(Boolean).join("\n\n");
+}
+
 function reasoningEffortForProfile(
   profile?: string,
 ): "minimal" | "low" | "medium" | "high" | "xhigh" | null {
@@ -1135,6 +1178,7 @@ function sendMessageViaApi(
   // roles, so reloaded sessions stay clean too.
   const ctxSystem = contextFolderSystemMessage(contextFolder);
   if (ctxSystem) messages.unshift(ctxSystem);
+  messages.unshift(openUISystemMessage());
 
   const reasoningEffort = reasoningEffortForProfile(profile);
   const bodyObj: Record<string, unknown> = {
@@ -1530,7 +1574,10 @@ function sendMessageViaRuns(
   const reasoningEffort = reasoningEffortForProfile(profile);
   if (reasoningEffort) bodyObj.reasoning_effort = reasoningEffort;
   if (sessionId) bodyObj.session_id = sessionId;
-  if (ctxSystem) bodyObj.instructions = ctxSystem.content;
+  bodyObj.instructions = combineInstructions(
+    OPENUI_SYSTEM_INSTRUCTIONS,
+    ctxSystem?.content,
+  );
   const bodyBuf = Buffer.from(JSON.stringify(bodyObj), "utf-8");
   const headers = getJsonApiHeaders(profile, bodyBuf);
   if (sessionId) {

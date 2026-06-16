@@ -3338,6 +3338,238 @@ body {
   margin: 6px 0;
 }
 
+/* OpenUI GenUI components */
+.genui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.genui-stack-item {
+  min-width: 0;
+}
+
+.genui-callout,
+.genui-plan-card,
+.genui-form,
+.genui-agent-status,
+.genui-risk-list,
+.genui-tool-summary,
+.genui-file-card {
+  border: 1px solid var(--border-bright);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 14px;
+}
+
+.genui-callout {
+  border-left: 3px solid var(--accent);
+}
+
+.genui-callout-title,
+.genui-plan-title,
+.genui-form-title,
+.genui-risk-title,
+.genui-tool-title,
+.genui-file-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.genui-callout-body {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.genui-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.genui-stat-tile {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  padding: 12px;
+}
+
+.genui-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.genui-stat-value {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--text-primary);
+}
+
+.genui-stat-change {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--accent-text);
+}
+
+.genui-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.genui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.genui-table th,
+.genui-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.genui-table th {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.genui-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.genui-plan-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.genui-plan-list li + li {
+  margin-top: 6px;
+}
+
+.genui-followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.genui-followup,
+.genui-form-submit {
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 11px;
+}
+
+.genui-followup:hover:not(:disabled),
+.genui-form-submit:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.genui-form-fields {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.genui-form-field {
+  display: grid;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.genui-form-field input {
+  border: 1px solid var(--border-bright);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  padding: 8px 10px;
+}
+
+.genui-form-field input:focus {
+  border-color: var(--border-focus);
+  outline: none;
+}
+
+.genui-form-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.genui-agent-status-main,
+.genui-tool-item {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.genui-agent-status-phase,
+.genui-tool-name {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.genui-agent-status-pill,
+.genui-tool-outcome {
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  font-size: 12px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.genui-agent-status-detail,
+.genui-file-summary {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.genui-risk-items,
+.genui-file-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.genui-risk-items li + li,
+.genui-file-list li + li {
+  margin-top: 6px;
+}
+
+.genui-tool-items {
+  display: grid;
+  gap: 8px;
+}
+
+.genui-tool-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  padding: 8px 10px;
+}
+
+.genui-file-list code {
+  color: var(--text-primary);
+}
+
 /* Typing indicator */
 .chat-typing {
   display: inline-flex;
