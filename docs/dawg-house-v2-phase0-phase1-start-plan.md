@@ -31,6 +31,18 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - Use GSD/TDD for Phase 1 if the OpenUI renderer + Artifacts work becomes stateful across several files.
 - Do not use BMad unless the product direction changes and planning needs to restart.
 
+## Current Status
+
+- Phase 0 is complete and committed: `f9c191d feat: establish SBC Tech phase 0 foundation`.
+- The fork is pinned, `upstream` is configured, dependencies install, and the app boots on macOS.
+- PostHog telemetry is removed from runtime/source code, dependencies, CSP, and Settings UI.
+- The SBC Tech marker renders in the sidebar brand area.
+- The `sbc-tech` theme is registered in the theme registry and is the default dark theme for new installs.
+- Manual smoke confirmed: app returns to the expected setup/main state after restart.
+- Automated verification passed: `npm run typecheck`, `npm run test`, `npm run build`, and dev startup probe.
+- Next session should start Phase 1 at Issue 6: add `@openuidev/react-lang`, create the shared renderer module, and test the `isOpenUI` detector before changing chat rendering.
+- Do not start phases 2-6 until Phase 1 inline OpenUI plus Artifacts is usable as the daily-driver MVP.
+
 ## Pinned Fork Base
 
 - Recorded: 2026-06-15
