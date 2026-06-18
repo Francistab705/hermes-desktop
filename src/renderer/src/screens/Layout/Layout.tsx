@@ -27,6 +27,7 @@ import Models from "../Models/Models";
 import Providers from "../Providers/Providers";
 import Schedules from "../Schedules/Schedules";
 import Kanban from "../Kanban/Kanban";
+import Workshop from "../Workshop/Workshop";
 import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import hermeslogo from "../../assets/hermes-one.svg";
@@ -48,9 +49,11 @@ import {
   PanelLeftOpen,
   ChevronDown,
   ChevronRight,
+  Workflow,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
+import type { WorkshopDelegationEvent } from "../../../../shared/workshop";
 
 type View =
   | "chat"
@@ -63,12 +66,18 @@ type View =
   | "skills"
   | "memory"
   | "tools"
+  | "workshop"
   | "schedules"
   | "kanban"
   | "gateway"
   | "settings";
 
-const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
+const NAV_ITEMS: {
+  view: View;
+  icon: LucideIcon;
+  labelKey?: string;
+  label?: string;
+}[] = [
   { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
   { view: "sessions", icon: Clock, labelKey: "navigation.sessions" },
   { view: "discover", icon: Compass, labelKey: "navigation.discover" },
@@ -82,6 +91,7 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   // longer a top-level nav item.
   { view: "memory", icon: Brain, labelKey: "navigation.memory" },
   { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
+  { view: "workshop", icon: Workflow, label: "Workshop" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
@@ -89,6 +99,7 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
 
 const SIDEBAR_COLLAPSED_KEY = "hermes.sidebar.collapsed";
 const SESSIONS_EXPANDED_KEY = "hermes.sidebar.sessionsExpanded";
+const WORKSHOP_LIVE_EVENT_LIMIT = 200;
 
 interface LayoutProps {
   verifyWarning?: boolean;
@@ -108,6 +119,9 @@ function Layout({
   // tracks the selected profile and always equals the active run's profile.
   const [activeProfile, setActiveProfile] = useState("default");
   const [runs, setRuns] = useState<ChatRun[]>(() => [mintRun("default")]);
+  const [workshopLiveEvents, setWorkshopLiveEvents] = useState<
+    Record<string, WorkshopDelegationEvent[]>
+  >({});
   const [activeRunId, setActiveRunId] = useState<string>(() => runs[0].runId);
   // While a resume's history is loading, show its spinner immediately.
   const [resumingSessionId, setResumingSessionId] = useState<string | null>(
@@ -120,6 +134,8 @@ function Layout({
 
   const currentSessionId =
     runs.find((r) => r.runId === activeRunId)?.sessionId ?? null;
+  const activeRunProfile =
+    runs.find((r) => r.runId === activeRunId)?.profile ?? activeProfile;
 
   const loadingSessionIds = useMemo(
     () => deriveLoadingSessionIds(runs),
@@ -154,6 +170,24 @@ function Layout({
   const getAppearance = useCallback(
     (profile: string) => profileAppearance[profile] ?? {},
     [profileAppearance],
+  );
+
+  const handleWorkshopEvent = useCallback(
+    (profile: string | undefined, event: WorkshopDelegationEvent) => {
+      const key = profile && profile !== "default" ? profile : "default";
+      setWorkshopLiveEvents((prev) => {
+        const existing = prev[key] ?? [];
+        const index = existing.findIndex((item) => item.id === event.id);
+        const next =
+          index >= 0
+            ? existing.map((item, itemIndex) =>
+                itemIndex === index ? { ...item, ...event } : item,
+              )
+            : [...existing, event];
+        return { ...prev, [key]: next.slice(-WORKSHOP_LIVE_EVENT_LIMIT) };
+      });
+    },
+    [],
   );
 
   // Per-run reporters wired into each <Chat>.
@@ -509,7 +543,8 @@ function Layout({
         </div>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => {
+          {NAV_ITEMS.map(({ view: v, icon: Icon, labelKey, label }) => {
+            const navLabel = labelKey ? t(labelKey) : (label ?? v);
             if (v === "sessions") {
               const recentToggleLabel = sessionsExpanded
                 ? t("navigation.hideRecentSessions")
@@ -520,11 +555,11 @@ function Layout({
                     <button
                       className={`sidebar-nav-item ${view === v ? "active" : ""}`}
                       onClick={() => goTo(v)}
-                      title={t(labelKey)}
-                      aria-label={t(labelKey)}
+                      title={navLabel}
+                      aria-label={navLabel}
                     >
                       <Icon size={16} />
-                      <span className="sidebar-nav-label">{t(labelKey)}</span>
+                      <span className="sidebar-nav-label">{navLabel}</span>
                     </button>
                     {!sidebarCollapsed && (
                       <button
@@ -559,11 +594,11 @@ function Layout({
                 key={v}
                 className={`sidebar-nav-item ${view === v ? "active" : ""}`}
                 onClick={() => goTo(v)}
-                title={t(labelKey)}
-                aria-label={t(labelKey)}
+                title={navLabel}
+                aria-label={navLabel}
               >
                 <Icon size={16} />
-                <span className="sidebar-nav-label">{t(labelKey)}</span>
+                <span className="sidebar-nav-label">{navLabel}</span>
               </button>
             );
           })}
@@ -638,6 +673,7 @@ function Layout({
                 onLoadingChange={handleRunLoading}
                 onSessionIdChange={handleRunSessionId}
                 onTitleChange={handleRunTitle}
+                onWorkshopEvent={handleWorkshopEvent}
               />
             </div>
           ))}
@@ -736,6 +772,22 @@ function Layout({
               visible={view === "tools"}
               onBrowseSkills={() => focusDiscover("skills")}
               onBrowseMcps={() => focusDiscover("mcps")}
+            />
+          </div>
+        )}
+
+        {visitedViews.has("workshop") && (
+          <div style={paneStyle("workshop")}>
+            <Workshop
+              profile={activeRunProfile}
+              visible={view === "workshop"}
+              liveEvents={
+                workshopLiveEvents[
+                  activeRunProfile && activeRunProfile !== "default"
+                    ? activeRunProfile
+                    : "default"
+                ] ?? []
+              }
             />
           </div>
         )}

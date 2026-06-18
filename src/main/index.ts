@@ -103,6 +103,14 @@ import {
   stopDashboard,
 } from "./dashboard";
 import {
+  getWorkshopStatus,
+  recordWorkshopProgress,
+  recordWorkshopToolEvent,
+  saveWorkshopHistory,
+  listWorkshopHistory,
+  loadWorkshopHistory,
+} from "./workshop";
+import {
   startSshTunnel,
   ensureSshTunnel,
   getSshTunnelUrl,
@@ -1340,6 +1348,10 @@ function setupIPC(): void {
                 err,
               );
             }
+            // Persist this turn's delegation tree (no-op if it didn't
+            // delegate). Best-effort and fire-and-forget so it never blocks
+            // or fails the chat completion.
+            void saveWorkshopHistory(profile, sessionId);
             safeSend("chat-done", sessionId || "");
             resolveChat({ response: fullResponse, sessionId });
             // Desktop notification when window is not focused and response took >10s
@@ -1374,9 +1386,11 @@ function setupIPC(): void {
             }
           },
           onToolProgress: (tool) => {
+            recordWorkshopProgress(profile, chatRunId, tool);
             safeSend("chat-tool-progress", tool);
           },
           onToolEvent: (toolEvent) => {
+            recordWorkshopToolEvent(profile, chatRunId, toolEvent);
             safeSend("chat-tool-event", toolEvent);
           },
           onUsage: (usage) => {
@@ -1595,6 +1609,29 @@ function setupIPC(): void {
   );
   ipcMain.handle("stop-dashboard", (_event, profile?: string) =>
     stopDashboard(profile),
+  );
+  ipcMain.handle("workshop-status", (_event, profile?: string) =>
+    getWorkshopStatus(profile),
+  );
+  ipcMain.handle("workshop-history-list", (_event, profile?: string) =>
+    listWorkshopHistory(profile),
+  );
+  ipcMain.handle(
+    "workshop-history-load",
+    (_event, path: string, profile?: string) =>
+      loadWorkshopHistory(profile, path),
+  );
+  // Renderer-driven save: the dashboard chat transport runs in the renderer
+  // and completes turns there, so it signals turn-end here to persist any
+  // delegation tree (no-op if the turn didn't delegate).
+  ipcMain.handle(
+    "workshop-history-save",
+    (
+      _event,
+      sessionId?: string,
+      profile?: string,
+      events?: import("./tui-gateway-stream").GatewayEvent[],
+    ) => saveWorkshopHistory(profile, sessionId, events),
   );
 
   // Platform toggles (config.yaml platforms section)

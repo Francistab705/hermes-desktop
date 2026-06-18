@@ -4,6 +4,11 @@ import type { Attachment } from "../shared/attachments";
 import type { DesktopSessionContinuationItem } from "../shared/session-continuation";
 import type { DesktopSessionLocalError } from "../shared/session-continuation";
 import type {
+  WorkshopStatus,
+  WorkshopHistoryEntry,
+  WorkshopHistoryDetail,
+} from "../shared/workshop";
+import type {
   MessagingPlatformsResponse,
   MessagingPlatformTestResponse,
   MessagingPlatformUpdate,
@@ -648,6 +653,21 @@ const hermesAPI = {
     ipcRenderer.invoke("start-dashboard", profile),
   stopDashboard: (profile?: string): Promise<boolean> =>
     ipcRenderer.invoke("stop-dashboard", profile),
+  getWorkshopStatus: (profile?: string): Promise<WorkshopStatus> =>
+    ipcRenderer.invoke("workshop-status", profile),
+  listWorkshopHistory: (profile?: string): Promise<WorkshopHistoryEntry[]> =>
+    ipcRenderer.invoke("workshop-history-list", profile),
+  loadWorkshopHistory: (
+    path: string,
+    profile?: string,
+  ): Promise<WorkshopHistoryDetail> =>
+    ipcRenderer.invoke("workshop-history-load", path, profile),
+  saveWorkshopHistory: (
+    sessionId?: string,
+    profile?: string,
+    events?: Array<{ type: string; payload: Record<string, unknown> }>,
+  ): Promise<void> =>
+    ipcRenderer.invoke("workshop-history-save", sessionId, profile, events),
 
   // Platform toggles
   getPlatformEnabled: (profile?: string): Promise<Record<string, boolean>> =>

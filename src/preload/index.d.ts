@@ -3,6 +3,11 @@ import type { Attachment } from "../shared/attachments";
 import type { DesktopSessionContinuationItem } from "../shared/session-continuation";
 import type { DesktopSessionLocalError } from "../shared/session-continuation";
 import type {
+  WorkshopStatus,
+  WorkshopHistoryEntry,
+  WorkshopHistoryDetail,
+} from "../shared/workshop";
+import type {
   RegistryKind,
   RegistryItem,
   RegistryCatalog,
@@ -472,6 +477,17 @@ interface HermesAPI {
   dashboardStatus: (profile?: string) => Promise<DashboardStatus>;
   startDashboard: (profile?: string) => Promise<DashboardStatus>;
   stopDashboard: (profile?: string) => Promise<boolean>;
+  getWorkshopStatus: (profile?: string) => Promise<WorkshopStatus>;
+  listWorkshopHistory: (profile?: string) => Promise<WorkshopHistoryEntry[]>;
+  loadWorkshopHistory: (
+    path: string,
+    profile?: string,
+  ) => Promise<WorkshopHistoryDetail>;
+  saveWorkshopHistory: (
+    sessionId?: string,
+    profile?: string,
+    events?: Array<{ type: string; payload: Record<string, unknown> }>,
+  ) => Promise<void>;
 
   // Platform toggles
   getPlatformEnabled: (profile?: string) => Promise<Record<string, boolean>>;

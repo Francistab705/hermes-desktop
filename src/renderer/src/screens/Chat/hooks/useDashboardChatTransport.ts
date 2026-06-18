@@ -12,6 +12,7 @@ import {
 import { DashboardGatewayClient } from "../dashboardGatewayClient";
 import type { ActiveTurn, Attachment, ChatMessage, UsageState } from "../types";
 import type { DesktopSessionContinuationItem } from "../../../../../shared/session-continuation";
+import type { WorkshopDelegationEvent } from "../../../../../shared/workshop";
 
 interface SessionResponse {
   info?: unknown;
@@ -88,6 +89,7 @@ interface UseDashboardChatTransportArgs {
   modelBaseUrl?: string;
   profile?: string;
   provider?: string;
+  onWorkshopEvent?: (event: WorkshopDelegationEvent) => void;
   setHermesSessionId: (id: string) => void;
   setIsLoading: (loading: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
@@ -112,7 +114,102 @@ interface DashboardSeedOptions {
 
 type DashboardConnectionMode = "local" | "remote" | "ssh";
 
-export function dashboardChatEnabledFromEnv(value: string | undefined): boolean {
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function normalizeWorkshopStatus(
+  value: unknown,
+): WorkshopDelegationEvent["status"] {
+  return value === "queued" ||
+    value === "running" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "paused"
+    ? value
+    : "unknown";
+}
+
+function mapWorkshopEvent(
+  event: DashboardStreamEvent,
+): WorkshopDelegationEvent | null {
+  const payload = (event.payload as Record<string, unknown> | undefined) ?? {};
+  const subagentId = stringValue(payload.subagent_id);
+  const toolId = stringValue(payload.tool_id);
+  const id =
+    subagentId || toolId || `${event.session_id || "session"}:${event.type}`;
+  const model = stringValue(payload.model);
+  const goal = stringValue(payload.goal) || stringValue(payload.context);
+  const text =
+    stringValue(payload.text) ||
+    stringValue(payload.summary) ||
+    stringValue(payload.tool_preview);
+
+  if (event.type === "tool.start" && payload.name === "delegate_task") {
+    return {
+      id,
+      parentId: null,
+      agent: "Main agent",
+      status: "running",
+      title: "delegate_task",
+      detail: goal || "Delegation tool call started.",
+      timestamp: Date.now(),
+      source: "event",
+    };
+  }
+
+  if (event.type === "tool.complete" && payload.name === "delegate_task") {
+    return {
+      id,
+      parentId: null,
+      agent: "Main agent",
+      status: "completed",
+      title: "delegate_task complete",
+      detail: stringValue(payload.summary) || "Delegation tool call completed.",
+      timestamp: Date.now(),
+      source: "event",
+    };
+  }
+
+  if (!event.type.startsWith("subagent.")) return null;
+
+  return {
+    id,
+    parentId: stringValue(payload.parent_id) || null,
+    agent: model || "Subagent",
+    status:
+      event.type === "subagent.complete"
+        ? normalizeWorkshopStatus(payload.status) === "unknown"
+          ? "completed"
+          : normalizeWorkshopStatus(payload.status)
+        : "running",
+    title: goal || stringValue(payload.child_session_id) || id,
+    detail: [
+      text,
+      model ? `model: ${model}` : "",
+      numberValue(payload.tool_count) != null
+        ? `tools used: ${numberValue(payload.tool_count)}`
+        : "",
+      numberValue(payload.depth) != null
+        ? `depth: ${numberValue(payload.depth)}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    timestamp: Date.now(),
+    source: "event",
+  };
+}
+
+export function dashboardChatEnabledFromEnv(
+  value: string | undefined,
+): boolean {
   return value !== "0" && value?.toLowerCase() !== "false";
 }
 
@@ -218,12 +315,15 @@ export async function ensureDashboardRuntimeSession(
   const seedMessages = dashboardSeedMessagesFromTranscript(params.messages, {
     excludeUserId: params.excludeSeedUserId ?? null,
   });
-  const created = await params.client.request<SessionResponse>("session.create", {
-    cols,
-    ...(seedMessages.length > 0 ? { messages: seedMessages } : {}),
-    ...(params.contextFolder ? { cwd: params.contextFolder } : {}),
-    ...(params.profile ? { profile: params.profile } : {}),
-  });
+  const created = await params.client.request<SessionResponse>(
+    "session.create",
+    {
+      cols,
+      ...(seedMessages.length > 0 ? { messages: seedMessages } : {}),
+      ...(params.contextFolder ? { cwd: params.contextFolder } : {}),
+      ...(params.profile ? { profile: params.profile } : {}),
+    },
+  );
 
   return {
     created: true,
@@ -278,7 +378,9 @@ function builtInProviderForCustomBaseUrl(
   return preset.id;
 }
 
-function modelOptionsSummary(live: ModelOptionsResponse | null | undefined): string {
+function modelOptionsSummary(
+  live: ModelOptionsResponse | null | undefined,
+): string {
   const providers = live?.providers ?? [];
   const custom = providers
     .filter((provider) => provider.slug?.toLowerCase().startsWith("custom:"))
@@ -300,15 +402,15 @@ function base64FromDataUrl(dataUrl: string | undefined): string {
   return comma >= 0 ? dataUrl.slice(comma + 1) : "";
 }
 
-function safeAttachmentFilename(name: string | undefined, index: number): string {
+function safeAttachmentFilename(
+  name: string | undefined,
+  index: number,
+): string {
   const trimmed = (name || "").trim();
   return trimmed || `image-${index + 1}.png`;
 }
 
-function safeFileAttachmentName(
-  attachment: Attachment,
-  index: number,
-): string {
+function safeFileAttachmentName(attachment: Attachment, index: number): string {
   const trimmed = (attachment.name || "").trim();
   if (trimmed) return trimmed;
   return `attachment-${index + 1}`;
@@ -350,7 +452,9 @@ export function dashboardPromptTextForAttachments(
       attachment.kind === "path-ref",
   );
   if (!supported) return null;
-  const images = attachments.filter((attachment) => attachment.kind === "image");
+  const images = attachments.filter(
+    (attachment) => attachment.kind === "image",
+  );
   if (images.some((image) => !base64FromDataUrl(image.dataUrl))) return null;
   const files = attachments.filter((attachment) => attachment.kind !== "image");
   const hasAttachableFiles = files.every((attachment) => {
@@ -482,7 +586,8 @@ export function resolveDashboardProviderForModel(
 
   if (requestedBaseUrl) {
     const baseMatches = customProviders.filter(
-      (provider) => normalizeBaseUrl(providerBaseUrl(provider)) === requestedBaseUrl,
+      (provider) =>
+        normalizeBaseUrl(providerBaseUrl(provider)) === requestedBaseUrl,
     );
     return (
       baseMatches.find((provider) => modelIsListedByProvider(provider, model))
@@ -530,7 +635,10 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function payloadTextLength(payload: Record<string, unknown>, key: string): number {
+function payloadTextLength(
+  payload: Record<string, unknown>,
+  key: string,
+): number {
   return typeof payload[key] === "string" ? payload[key].length : 0;
 }
 
@@ -636,7 +744,11 @@ function previousUserIdBefore(
   for (let i = beforeIndex - 1; i >= 0; i--) {
     const message = messages[i];
     if (isBubbleMessage(message) && message.role === "user") return message.id;
-    if (isBubbleMessage(message) && message.role === "agent" && !message.error) {
+    if (
+      isBubbleMessage(message) &&
+      message.role === "agent" &&
+      !message.error
+    ) {
       return null;
     }
   }
@@ -659,7 +771,8 @@ export function dashboardSeedMessagesFromTranscript(
   const seed: DashboardSeedMessage[] = [];
   for (const message of messages) {
     if (!isBubbleMessage(message)) continue;
-    if (message.role === "user" && message.id === options.excludeUserId) continue;
+    if (message.role === "user" && message.id === options.excludeUserId)
+      continue;
     if (message.localOnly || message.error || message.pending) continue;
     if (failedUserIds.has(message.id)) continue;
     const content = normalizeMessageText(message.content);
@@ -712,7 +825,9 @@ export function dashboardContinuationItemsFromTranscript(
         kind: "assistant",
         content,
         ...(error ? { error } : {}),
-        ...(message.attachments?.length ? { attachments: message.attachments } : {}),
+        ...(message.attachments?.length
+          ? { attachments: message.attachments }
+          : {}),
       });
       continue;
     }
@@ -763,6 +878,7 @@ export function useDashboardChatTransport({
   messages,
   model,
   modelBaseUrl,
+  onWorkshopEvent,
   profile,
   provider,
   setHermesSessionId,
@@ -782,6 +898,13 @@ export function useDashboardChatTransport({
   const recreateRuntimeSessionRef = useRef(false);
   const lastRuntimeSessionWasCreatedRef = useRef(false);
   const pendingClarifyRequestIdRef = useRef<string | null>(null);
+  // Accumulates this turn's subagent/delegation events so we can persist the
+  // tree to Workshop history on turn completion. The dashboard chat transport
+  // runs here in the renderer, so these events never reach the main process's
+  // separate gateway client — we must capture them at the source.
+  const delegationEventsRef = useRef<
+    Array<{ type: string; payload: Record<string, unknown> }>
+  >([]);
   const pendingRecoveredContinuationRef = useRef<
     DesktopSessionContinuationItem[]
   >([]);
@@ -822,13 +945,34 @@ export function useDashboardChatTransport({
   const handleGatewayEvent = useCallback(
     (event: DashboardStreamEvent): void => {
       const runtimeSessionId = runtimeSessionIdRef.current;
-      if (event.session_id && runtimeSessionId && event.session_id !== runtimeSessionId) {
+      if (
+        event.session_id &&
+        runtimeSessionId &&
+        event.session_id !== runtimeSessionId
+      ) {
         logDashboardEvent(event, "dropped", runtimeSessionId);
         return;
       }
       logDashboardEvent(event, "accepted", runtimeSessionId);
 
-      const failed = event.type === "message.complete" && completionFailed(event.payload);
+      // Capture delegation traffic for Workshop history (persisted on
+      // turn-complete below).
+      if (
+        event.type.startsWith("subagent.") ||
+        ((event.type === "tool.start" || event.type === "tool.complete") &&
+          (event.payload as Record<string, unknown> | undefined)?.name ===
+            "delegate_task")
+      ) {
+        const workshopEvent = mapWorkshopEvent(event);
+        if (workshopEvent) onWorkshopEvent?.(workshopEvent);
+        delegationEventsRef.current.push({
+          type: event.type,
+          payload: (event.payload as Record<string, unknown>) ?? {},
+        });
+      }
+
+      const failed =
+        event.type === "message.complete" && completionFailed(event.payload);
       const next = applyDashboardStreamEvent(
         {
           messages: messagesRef.current,
@@ -875,6 +1019,24 @@ export function useDashboardChatTransport({
         activeTurnRef.current = null;
         setToolProgress(null);
         setIsLoading(false);
+        // Persist this turn's delegation tree to Workshop history. The
+        // dashboard transport runs in the renderer with its own gateway
+        // client, so we save via that same client using the delegation events
+        // captured above (the main process's separate client never saw them).
+        const delegationEvents = delegationEventsRef.current;
+        delegationEventsRef.current = [];
+        if (
+          delegationEvents.length > 0 &&
+          typeof window.hermesAPI.saveWorkshopHistory === "function"
+        ) {
+          void window.hermesAPI
+            .saveWorkshopHistory(
+              storedSessionIdRef.current ?? undefined,
+              profile,
+              delegationEvents,
+            )
+            .catch(() => undefined);
+        }
         const usage = usageFromPayload(event.payload);
         if (usage) {
           setUsage((prev) => ({
@@ -908,6 +1070,7 @@ export function useDashboardChatTransport({
     [
       activeTurnRef,
       connectionMode,
+      onWorkshopEvent,
       setIsLoading,
       setMessages,
       setToolProgress,
@@ -915,49 +1078,50 @@ export function useDashboardChatTransport({
     ],
   );
 
-  const ensureClient = useCallback(async (): Promise<DashboardGatewayClient> => {
-    const existing = clientRef.current;
-    if (existing?.connected) return existing;
-    if (connectingRef.current) return connectingRef.current;
+  const ensureClient =
+    useCallback(async (): Promise<DashboardGatewayClient> => {
+      const existing = clientRef.current;
+      if (existing?.connected) return existing;
+      if (connectingRef.current) return connectingRef.current;
 
-    const generation = clientGenerationRef.current;
-    const pending = (async () => {
-      const status = await window.hermesAPI.startDashboard(profile);
-      if (clientGenerationRef.current !== generation) {
-        throw new Error("Hermes dashboard connection was superseded");
-      }
-      if (!status.running || !status.connection?.wsUrl) {
-        throw new Error(
-          status.error || "Hermes dashboard transport is unavailable",
-        );
-      }
-      let client: DashboardGatewayClient;
-      client = new DashboardGatewayClient({
-        onEvent: handleGatewayEvent,
-        onClose: () => {
-          if (clientRef.current === client) {
-            clientRef.current = null;
-          }
-        },
-      });
-      await client.connect(status.connection.wsUrl);
-      if (clientGenerationRef.current !== generation) {
-        client.close();
-        throw new Error("Hermes dashboard connection was superseded");
-      }
-      clientRef.current = client;
-      return client;
-    })();
-    connectingRef.current = pending;
+      const generation = clientGenerationRef.current;
+      const pending = (async () => {
+        const status = await window.hermesAPI.startDashboard(profile);
+        if (clientGenerationRef.current !== generation) {
+          throw new Error("Hermes dashboard connection was superseded");
+        }
+        if (!status.running || !status.connection?.wsUrl) {
+          throw new Error(
+            status.error || "Hermes dashboard transport is unavailable",
+          );
+        }
+        let client: DashboardGatewayClient;
+        client = new DashboardGatewayClient({
+          onEvent: handleGatewayEvent,
+          onClose: () => {
+            if (clientRef.current === client) {
+              clientRef.current = null;
+            }
+          },
+        });
+        await client.connect(status.connection.wsUrl);
+        if (clientGenerationRef.current !== generation) {
+          client.close();
+          throw new Error("Hermes dashboard connection was superseded");
+        }
+        clientRef.current = client;
+        return client;
+      })();
+      connectingRef.current = pending;
 
-    try {
-      return await pending;
-    } finally {
-      if (connectingRef.current === pending) {
-        connectingRef.current = null;
+      try {
+        return await pending;
+      } finally {
+        if (connectingRef.current === pending) {
+          connectingRef.current = null;
+        }
       }
-    }
-  }, [handleGatewayEvent, profile]);
+    }, [handleGatewayEvent, profile]);
 
   const ensureRuntimeSession = useCallback(
     async (
@@ -1004,10 +1168,15 @@ export function useDashboardChatTransport({
   );
 
   const ensureSelectedModel = useCallback(
-    async (client: DashboardGatewayClient, sessionId: string): Promise<string> => {
+    async (
+      client: DashboardGatewayClient,
+      sessionId: string,
+    ): Promise<string> => {
       const command = dashboardModelCommand(provider, model);
       if (!command) return sessionId;
-      const resetRuntimeSession = async (targetSessionId: string): Promise<string> => {
+      const resetRuntimeSession = async (
+        targetSessionId: string,
+      ): Promise<string> => {
         const storedSessionId = storedSessionIdRef.current;
         await client
           .request("session.close", { session_id: targetSessionId })
@@ -1022,9 +1191,12 @@ export function useDashboardChatTransport({
       const switchAndValidate = async (
         targetSessionId: string,
       ): Promise<string> => {
-        let before = await client.request<ModelOptionsResponse>("model.options", {
-          session_id: targetSessionId,
-        });
+        let before = await client.request<ModelOptionsResponse>(
+          "model.options",
+          {
+            session_id: targetSessionId,
+          },
+        );
         let dashboardProvider = resolveDashboardProviderForModel(
           provider,
           model,
@@ -1078,15 +1250,21 @@ export function useDashboardChatTransport({
         const key = `${targetSessionId}\n${dashboardProvider}\n${model}`;
         let slashResponse: SlashExecResponse | null = null;
         if (appliedModelRef.current !== key) {
-          slashResponse = await client.request<SlashExecResponse>("slash.exec", {
-            session_id: targetSessionId,
-            command: resolvedCommand,
-          });
+          slashResponse = await client.request<SlashExecResponse>(
+            "slash.exec",
+            {
+              session_id: targetSessionId,
+              command: resolvedCommand,
+            },
+          );
         }
 
-        const live = await client.request<ModelOptionsResponse>("model.options", {
-          session_id: targetSessionId,
-        });
+        const live = await client.request<ModelOptionsResponse>(
+          "model.options",
+          {
+            session_id: targetSessionId,
+          },
+        );
         if (!dashboardModelMatches(dashboardProvider, model, live)) {
           appliedModelRef.current = null;
           const warning = slashResponse?.warning
@@ -1145,7 +1323,11 @@ export function useDashboardChatTransport({
           const activeTurn = activeTurnRef.current;
           if (activeTurn) activeTurn.status = "failed";
           setMessages((prev) => {
-            const failedMessages = markActiveTurnFailed(prev, message, activeTurn);
+            const failedMessages = markActiveTurnFailed(
+              prev,
+              message,
+              activeTurn,
+            );
             messagesRef.current = failedMessages;
             return failedMessages;
           });
@@ -1155,7 +1337,10 @@ export function useDashboardChatTransport({
           return true;
         }
       }
-      const dashboardText = dashboardPromptTextForAttachments(text, attachments);
+      const dashboardText = dashboardPromptTextForAttachments(
+        text,
+        attachments,
+      );
       const mergePendingRecoveredContinuation = (
         existing: DesktopSessionContinuationItem[],
       ): DesktopSessionContinuationItem[] => {
@@ -1177,7 +1362,9 @@ export function useDashboardChatTransport({
           items.length > 0 &&
           typeof recordContinuation === "function"
         ) {
-          await recordContinuation(storedSessionId, items).catch(() => undefined);
+          await recordContinuation(storedSessionId, items).catch(
+            () => undefined,
+          );
         }
       };
       const failActiveTurn = (message: string): true => {
@@ -1255,15 +1442,17 @@ export function useDashboardChatTransport({
           lastRuntimeSessionWasCreatedRef.current ||
           pendingRecoveredContinuationRef.current.length > 0
         ) {
-          continuationItems = mergePendingRecoveredContinuation(continuationItems);
+          continuationItems =
+            mergePendingRecoveredContinuation(continuationItems);
         } else {
           continuationItems = [];
         }
         await recordContinuationItems(continuationItems);
-        const selectedSessionId = await ensureSelectedModel(client, runtimeSessionId);
-        await recordContinuationItems(
-          mergePendingRecoveredContinuation([]),
+        const selectedSessionId = await ensureSelectedModel(
+          client,
+          runtimeSessionId,
         );
+        await recordContinuationItems(mergePendingRecoveredContinuation([]));
         const syncedAttachments = await syncDashboardAttachments(
           client,
           selectedSessionId,
@@ -1314,9 +1503,11 @@ export function useDashboardChatTransport({
     const client = clientRef.current;
     const sessionId = runtimeSessionIdRef.current;
     if (!enabled || !client || !sessionId) return;
-    void client.request("session.interrupt", { session_id: sessionId }).catch(() => {
-      client.close();
-    });
+    void client
+      .request("session.interrupt", { session_id: sessionId })
+      .catch(() => {
+        client.close();
+      });
   }, [enabled]);
 
   useEffect(

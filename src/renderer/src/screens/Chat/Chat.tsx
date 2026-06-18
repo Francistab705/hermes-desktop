@@ -23,6 +23,7 @@ import { useI18n } from "../../components/useI18n";
 import { buildChatTranscript } from "./transcriptUtils";
 import { ConfigHealthBanner } from "../../components/ConfigHealthBanner";
 import type { Attachment } from "../../../../shared/attachments";
+import type { WorkshopDelegationEvent } from "../../../../shared/workshop";
 import type { ActiveTurn, ChatMessage, UsageState } from "./types";
 import type { ContextUsage } from "./ContextGauge";
 import { contextWindowForModel } from "./contextWindows";
@@ -59,6 +60,11 @@ interface ChatProps {
   onSessionIdChange?: (runId: string, sessionId: string | null) => void;
   /** Reports the first user message as a best-effort conversation title. */
   onTitleChange?: (runId: string, title: string) => void;
+  /** Streams delegation events upward so Workshop can render long tasks live. */
+  onWorkshopEvent?: (
+    profile: string | undefined,
+    event: WorkshopDelegationEvent,
+  ) => void;
 }
 
 function Chat({
@@ -73,6 +79,7 @@ function Chat({
   onLoadingChange,
   onSessionIdChange,
   onTitleChange,
+  onWorkshopEvent,
 }: ChatProps): React.JSX.Element {
   const { t } = useI18n();
   const [messages, setMessages] = useState<ChatMessage[]>(
@@ -143,8 +150,8 @@ function Chat({
             conn.mode === "local"
               ? "auto"
               : conn.mode === "ssh"
-              ? conn.sshChatTransport ?? "auto"
-              : conn.remoteChatTransport ?? "auto",
+                ? (conn.sshChatTransport ?? "auto")
+                : (conn.remoteChatTransport ?? "auto"),
           );
         }
       } catch {
@@ -166,8 +173,8 @@ function Chat({
         conn.mode === "local"
           ? "auto"
           : conn.mode === "ssh"
-          ? conn.sshChatTransport ?? "auto"
-          : conn.remoteChatTransport ?? "auto",
+            ? (conn.sshChatTransport ?? "auto")
+            : (conn.remoteChatTransport ?? "auto"),
       );
     });
     return (): void => {
@@ -253,8 +260,7 @@ function Chat({
     modelConfig.currentBaseUrl,
   ]);
 
-  const visibleSessionScopeId =
-    messages.length === 0 ? null : hermesSessionId;
+  const visibleSessionScopeId = messages.length === 0 ? null : hermesSessionId;
 
   useChatIPC({
     runId,
@@ -398,6 +404,7 @@ function Chat({
     messages,
     model: modelConfig.currentModel,
     modelBaseUrl: modelConfig.currentBaseUrl,
+    onWorkshopEvent: (event) => onWorkshopEvent?.(profile, event),
     profile,
     provider: modelConfig.currentProvider,
     setHermesSessionId,
