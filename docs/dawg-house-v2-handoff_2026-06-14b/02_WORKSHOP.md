@@ -1,7 +1,8 @@
 # 02 — Workshop Pane (Feature ②)
 
 > **Phase:** 2 (Cockpit) · **Mechanism:** new screen/component module in the fork ·
-> **Status:** live view + pause/interrupt shipped; one-off sub-agent chat parked.
+> **Status:** live view + pause/interrupt shipped; one-off sub-agent chat split
+> into Phase 3.
 
 ---
 
@@ -14,8 +15,8 @@ spawns, and interrupt a running sub-agent. It's the cockpit that makes the
 bar applies here most of all:** no modal gauntlets, instant feedback, live
 stream.
 
-One-off direct chat with a selected sub-agent is intentionally parked for a later
-steering pass. It is not required for Phase 2 closure.
+One-off direct chat with a selected sub-agent is intentionally split into its own
+Phase 3 steering pass. It is not required for Phase 2 closure.
 
 ---
 
@@ -52,11 +53,11 @@ No new orchestration. We consume what `delegate_tool.py` already emits.
 | 2.6 | Commit read-only Workshop | ✅ shipped in `ced1a1c` |
 | 2.7 | Add Pause / Interrupt buttons wired to `delegation.pause` + `subagent.interrupt` | ✅ shipped in `033884f` |
 
-### Parked
+### Phase 3 Follow-up
 
-| Step | Do | Why parked |
-|------|-----|------------|
-| 2.8 | One-off direct chat with a selected sub-agent (side-channel, not a detour) | Useful, but not needed for the current cockpit. Save for a later steering pass. |
+| Step | Do | Proves |
+|------|-----|--------|
+| 3.1 | One-off direct chat with a selected sub-agent (side-channel, not a detour) | Direct steer works without hijacking the main run. |
 
 ---
 
@@ -79,8 +80,8 @@ All plugin. **Zero backend edits.**
   reload.
 - ✅ Read-only path shipped before controls.
 - ✅ Pause/interrupt call the real RPCs.
-- ⏸️ One-off chat is parked and must be side-channel when built; it must not hijack
-  the main run.
+- ➡️ One-off chat is Phase 3 and must be side-channel when built; it must not
+  hijack the main run.
 - ✅ WCAG 2.2 AA; respects `prefers-reduced-motion` for any animated edges.
 
 ---

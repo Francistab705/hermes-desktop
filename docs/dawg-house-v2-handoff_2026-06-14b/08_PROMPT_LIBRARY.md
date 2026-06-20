@@ -1,6 +1,6 @@
 # 08 — Prompt Library / Presets (Feature ⑧)
 
-> **Phase:** 7 (Prompt Library) · **Mechanism:** new screen/component module in the fork ·
+> **Phase:** 8 (Prompt Library) · **Mechanism:** new screen/component module in the fork ·
 > **Source:** LibreChat (the pattern, not the code)
 
 ---

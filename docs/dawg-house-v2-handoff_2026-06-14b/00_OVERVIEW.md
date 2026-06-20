@@ -38,7 +38,7 @@ generative UI inline via OpenUI.
 > inline like Wibey.** Screenshot smoke verified the loop: generated UI rendered
 > in chat, a follow-up button sent a new user message, and Hermes responded with
 > another rendered UI section.
-> The other 10 features (Phases 2–11) are an explicit **post-MVP backlog** — add
+> The other features (Phases 2–12) are an explicit **post-MVP backlog** — add
 > them when you feel the itch, not before. v2 is a **personal** app (hermes-agent
 > brain, BYO-model); the Walmart v1 (`code_puppy_gui`) stays the work tool — no
 > Walmart/BQ/Store-Trapped/Element-Gateway carryover here.
@@ -89,17 +89,18 @@ generative UI inline via OpenUI.
 | # | Feature | Status | Notes | Phase | Doc |
 |---|---------|--------|-------|-------|-----|
 | ① | OpenUI inline generative UI (generate + render + interact) | **BUILD** | the signature; renderer branch in `MessageRow` + always-on OpenUI context file; precedent `ClarifyCard` | **1 🎯MVP** | `01` |
-| ② | Workshop pane | **BUILD** | live view + pause/interrupt shipped; one-off sub-agent chat parked | 2 | `02` |
-| ③ | Session branching + lineage tree + Wibey tabs | **BUILD** | new screen; one session model, two entry points | 3 | `03` |
+| ② | Workshop pane | **BUILD** | live view + pause/interrupt shipped | 2 | `02` |
+| ②b | One-off sub-agent chat | **BUILD** | side-channel direct chat with a selected sub-agent; must not hijack the main run | 3 | `02` |
+| ③ | Session branching + lineage tree + Wibey tabs | **BUILD** | new screen; one session model, two entry points | 4 | `03` |
 | ④ | Token / quota header pill | **ADOPT** | first header-pill pass shipped; click breakdown + threshold state | 2 | `04` |
-| ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 4 | `05` |
-| ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 5 | `06` |
-| ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 6 | `07` |
-| ⑧ | Prompt library / presets | **BUILD** | seeded from `memory/setting/prompts/`; Favorites parked (`08` §8) | 7 | `08` |
-| ⑨ | Saved Artifacts library | **BUILD** | persistent gallery/tab for generated OpenUI artifacts; shares ① renderer | 10 | `09` |
-| ⑩ | Graphiti knowledge graph + Timeline | **BUILD** | the one heavy dep (Neo4j); criteria-first | 11 (last) | `10` |
-| ⑪ | Personal Memory bridge | **ADOPT** | adopt hermes-desktop Memory UI + providers + SOUL.md; port only `/profile /daily /notes /memory` ergonomics | 8 | `11` |
-| ⑫ | Workflows (build + execute) | **EXTEND** | extends existing cron/schedules; skill + slash + checkpoints | 9 | `12` |
+| ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 5 | `05` |
+| ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 6 | `06` |
+| ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 7 | `07` |
+| ⑧ | Prompt library / presets | **BUILD** | seeded from `memory/setting/prompts/`; Favorites parked (`08` §8) | 8 | `08` |
+| ⑨ | Saved Artifacts library | **BUILD** | persistent gallery/tab for generated OpenUI artifacts; shares ① renderer | 11 | `09` |
+| ⑩ | Graphiti knowledge graph + Timeline | **BUILD** | the one heavy dep (Neo4j); criteria-first | 12 (last) | `10` |
+| ⑪ | Personal Memory bridge | **ADOPT** | adopt hermes-desktop Memory UI + providers + SOUL.md; port only `/profile /daily /notes /memory` ergonomics | 9 | `11` |
+| ⑫ | Workflows (build + execute) | **EXTEND** | extends existing cron/schedules; skill + slash + checkpoints | 10 | `12` |
 
 > **MVP = ① (Phase 1) on the Phase-0 foundation.** Saved Artifacts is no longer
 > a Phase-1 gate; it is promoted to its own later workspace/library phase.
@@ -126,19 +127,29 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 | **0 — Foundation** 🎯MVP | Fork `hermes-desktop` + pin + strip telemetry + boot `electron-vite dev` + hello-component + SBC Tech skin | A working SBC Tech-skinned desktop app (loop proven) |
 | **1 — Signature** 🎯MVP | OpenUI inline ① (generate + render + interact) | Generative UI in chat |
 | **2 — Cockpit** | Workshop ② + Token Pill ④ | Watch the orchestrator + usage state |
-| **3 — Branching** | Session branching + lineage tree ③ | Fork conversations into navigable timelines |
-| **4 — PIV Loop** | Plan → Implement → Validate ⑤ | Reviewable, checkpointed work loop |
-| **5 — Knowledge Base** | Upload + URL ingest + viewer + hybrid search ⑥ | Searchable reference corpus |
-| **6 — Terminal Handoff** | Embedded terminal + Send to CLI ⑦ | Hermes → opencode/CLI lane |
-| **7 — Prompt Library** | Saved prompts + variables + chat picker ⑧ | Reusable kickoff library |
-| **8 — Personal Memory Bridge** | `/profile /daily /notes /memory` ergonomics ⑪ | Francis memory muscle memory on Hermes primitives |
-| **9 — Workflows** | Skill-authored workflows + checkpoints + schedules ⑫ | Repeatable procedures |
-| **10 — Saved Artifacts** | Persistent generated UI gallery/tab ⑨ | Saved dashboards/reports/cards |
-| **11 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
+| **3 — Sub-agent Chat** | One-off side-channel chat with a selected sub-agent ②b | Direct steer without hijacking the main run |
+| **4 — Branching** | Session branching + lineage tree ③ | Fork conversations into navigable timelines |
+| **5 — PIV Loop** | Plan → Implement → Validate ⑤ | Reviewable, checkpointed work loop |
+| **6 — Knowledge Base** | Upload + URL ingest + viewer + hybrid search ⑥ | Searchable reference corpus |
+| **7 — Terminal Handoff** | Embedded terminal + Send to CLI ⑦ | Hermes → opencode/CLI lane |
+| **8 — Prompt Library** | Saved prompts + variables + chat picker ⑧ | Reusable kickoff library |
+| **9 — Personal Memory Bridge** | `/profile /daily /notes /memory` ergonomics ⑪ | Francis memory muscle memory on Hermes primitives |
+| **10 — Workflows** | Skill-authored workflows + checkpoints + schedules ⑫ | Repeatable procedures |
+| **11 — Saved Artifacts** | Persistent generated UI gallery/tab ⑨ | Saved dashboards/reports/cards |
+| **12 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
 
 > Polish is not a numbered phase. Wibey pass + a11y fold into each phase's exit criteria.
 > Workshop read-only, pause, and interrupt are shipped. One-off sub-agent chat is
-> deliberately parked for later and is not required to close Phase 2.
+> deliberately split into Phase 3 and is not required to close Phase 2.
+
+### Development Tracking Candidate
+
+Archon (`coleam00/archon`) is a good candidate for **implementation tracking and
+repeatable coding workflows**: it provides YAML workflow runs, worktree isolation,
+human approval gates, and a dashboard. Treat it as project tooling first, not a
+Hermes One product feature. If adopted, use it to track/run phases from this
+roadmap; do not let it replace the roadmap or duplicate Hermes Workflows unless
+we intentionally decide to integrate it later.
 
 ---
 
@@ -190,9 +201,9 @@ cold:
   interactions, and accessibility pass are committed and manually smoke-verified.
 - **Phase 2 — Cockpit:** mostly complete. Workshop live view, pause/interrupt
   controls, and Token Pill first pass are committed. One-off sub-agent chat is
-  parked for a later steering pass.
-- **Next major phase:** Phase 3 — Branching, unless a short stabilization pass is
-  chosen first. PIV is now its own Phase 4.
+  split into its own Phase 3.
+- **Next major phase:** Phase 3 — Sub-agent Chat, unless a short stabilization
+  pass is chosen first. Branching is now Phase 4.
 
 ### Original handoff status
 

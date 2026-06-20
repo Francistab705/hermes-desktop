@@ -1,6 +1,6 @@
 # 10 — Graphiti Knowledge Graph + Timeline (Feature ⑩)
 
-> **Phase:** 11 (build LAST) · **Mechanism:** new screen/component module + **Neo4j infra**
+> **Phase:** 12 (build LAST) · **Mechanism:** new screen/component module + **Neo4j infra**
 > (the one heavy dependency) · **Source:** DAWG House Epics 21/26/27
 
 ---
@@ -13,7 +13,7 @@ spine of Francis's original vision — "a headless brain that saves to a graph,
 trackable, fork from there." Answers "how did X evolve?" with a **Timeline**
 OpenUI component.
 
-> **Doc written now, BUILD deferred to Phase 11.** Every other feature is a plugin
+> **Doc written now, BUILD deferred to Phase 12.** Every other feature is a plugin
 > or a 1-file fork; this one drags in a running **Neo4j** instance. That's why it's
 > last — but Francis explicitly wants the full scope captured up front, not bolted
 > on later.
@@ -61,7 +61,7 @@ OpenUI component.
 
 ---
 
-## 5. Build steps (Phase 11)
+## 5. Build steps (Phase 12)
 
 | Step | Do | Proves |
 |------|-----|--------|
