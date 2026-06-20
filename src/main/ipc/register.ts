@@ -89,12 +89,21 @@ async function withSshDashboardModelLibrary<T>(conn: ConnectionConfig, dashboard
   const compat = await ensureSshDashboardCompatibility(conn.ssh);
   if (!compat.ok) {
     console.warn("[ssh-model-library] Dashboard model-library compatibility check failed", compat.error ? compat.detail + ": " + compat.error : compat.detail);
-  } else if (compat.applied) {
+    // Fall back to legacy operation when dashboard is not compatible
+    return legacyOperation();
+  }
+  if (compat.applied) {
     try { await sshStopGateway(conn.ssh); } catch (err) { console.warn("[ssh-model-library] Failed to stop patched gateway", err); }
     stopSshTunnel();
     await sshStartGateway(conn.ssh);
   }
-  return dashboardOperation(await getSshDashboardSessionConfig(conn));
+  try {
+    return await dashboardOperation(await getSshDashboardSessionConfig(conn));
+  } catch (err) {
+    // If dashboard operation fails (e.g. 404), fall back to legacy
+    console.warn("[ssh-model-library] Dashboard operation failed, falling back to legacy:", err);
+    return legacyOperation();
+  }
 }
 
 async function withRemoteDashboard<T>(conn: ConnectionConfig, dashboardOperation: () => Promise<T>, legacyOperation: () => Promise<T> | T): Promise<T> {
