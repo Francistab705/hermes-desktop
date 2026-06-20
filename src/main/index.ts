@@ -443,6 +443,7 @@ async function withSshDashboardModelLibrary<T>(
       "[ssh-model-library] Dashboard model-library compatibility check failed",
       compat.error ? `${compat.detail}: ${compat.error}` : compat.detail,
     );
+    return legacyOperation();
   } else if (compat.applied) {
     try {
       await sshStopGateway(conn.ssh);

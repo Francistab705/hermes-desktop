@@ -141,6 +141,33 @@ prompt, your key has a passphrase and SSH agent isn't loaded — either
 remove the passphrase, or load it into the agent before launching the
 desktop app.
 
+#### macOS: remember passphrases in Keychain
+
+Hermes Desktop uses `BatchMode=yes`, so it cannot open an interactive
+passphrase prompt for encrypted private keys. On macOS, add the key to
+the Apple Keychain once:
+
+```bash
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+```
+
+Then make sure `~/.ssh/config` matches the host value you enter in Hermes
+Desktop. If the app connects to the raw IP, include the raw IP in the
+`Host` line, not just a friendly alias:
+
+```sshconfig
+Host hostinger-vps 31.220.57.113
+  HostName 31.220.57.113
+  User root
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519
+  AddKeysToAgent yes
+  UseKeychain yes
+```
+
+After this, macOS should unlock the key from Keychain automatically after
+restarts or agent resets.
+
 ### 2. Configure the desktop app
 
 Open **Settings → Connection** and select **SSH Tunnel**. Fill in:
@@ -275,6 +302,19 @@ Hermes API may require an API key locally even when bound to
 leave blank if the gateway is configured for no-auth on localhost). The
 key, if used, is the one stored in your remote Hermes `.env`/`auth.json`,
 not a value you generate on the desktop.
+
+### Model library logs `Could not find Hermes Agent hermes_cli/web_server.py`
+
+Older or differently packaged remote Hermes Agent installs may not expose
+the dashboard model-library REST endpoints at `/api/model/library`, and
+Hermes Desktop may not be able to patch the remote dashboard source if it
+cannot find `hermes_cli/web_server.py` on the SSH host.
+
+In SSH Tunnel mode, Hermes Desktop falls back to direct SSH management of
+the remote `~/.hermes/models.json` file when that compatibility check
+fails. Model list/add/remove/update should still work as long as SSH auth
+works. To avoid repeated dashboard compatibility attempts, set SSH chat
+transport to **Legacy** in Settings if you do not need dashboard transport.
 
 ### Windows-specific: keys not persisting across restarts
 
