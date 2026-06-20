@@ -94,13 +94,13 @@ generative UI inline via OpenUI.
 | ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 4 | `06` |
 | ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 4 | `07` |
 | ⑧ | Prompt library / presets | **BUILD** | seeded from `memory/setting/prompts/`; Favorites parked (`08` §8) | 4 | `08` |
-| ⑨ | Artifacts canvas | **BUILD** | shares the ① OpenUI renderer (2nd mount) | **1 🎯MVP** | `09` |
+| ⑨ | Saved Artifacts library | **BUILD** | persistent gallery/tab for generated OpenUI artifacts; shares ① renderer | 5 | `09` |
 | ⑩ | Graphiti knowledge graph + Timeline | **BUILD** | the one heavy dep (Neo4j); criteria-first | 6 (last) | `10` |
 | ⑪ | Personal Memory bridge | **ADOPT** | adopt hermes-desktop Memory UI + providers + SOUL.md; port only `/profile /daily /notes /memory` ergonomics | 4 | `11` |
 | ⑫ | Workflows (build + execute) | **EXTEND** | extends existing cron/schedules; skill + slash + checkpoints | 4 | `12` |
 
-> **MVP = ① + ⑨ (Phase 1) on the Phase-0 foundation.** Everything else is
-> post-MVP backlog — independent deltas, build in any order.
+> **MVP = ① (Phase 1) on the Phase-0 foundation.** Saved Artifacts is no longer
+> a Phase-1 gate; it is promoted to its own later workspace/library phase.
 
 **Dropped (do not build):** Confluence ingest (replaced by plain webpage fetch via
 Hermes `web_tools`); the standalone Diff pane (not wanted). **Likely delete on
@@ -120,10 +120,11 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 | Phase | Build | Delivers |
 |-------|-------|----------|
 | **0 — Foundation** 🎯MVP | Fork `hermes-desktop` + pin + strip telemetry + boot `electron-vite dev` + hello-component + SBC Tech skin | A working SBC Tech-skinned desktop app (loop proven) |
-| **1 — Signature** 🎯MVP | OpenUI inline ① (generate + render) + Artifacts ⑨ | Generative UI, one renderer, two mounts |
+| **1 — Signature** 🎯MVP | OpenUI inline ① (generate + render + interact) | Generative UI in chat |
 | **2 — Cockpit** | Workshop ② (read-only) + token pill ④ | Watch the orchestrator |
 | **3 — Workbench DNA** | Branching ③ + PIV ⑤ | Fork timelines + structured plans |
 | **4 — Knowledge & tools** | KB ⑥ + terminal ⑦ + prompts ⑧ + memory ⑪ + workflows ⑫ | The analyst toolkit + Francis's brain |
+| **5 — Saved workspace** | Saved Artifacts ⑨ | Persistent generated UI gallery/tab |
 | **6 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
 
 > Phase 5 (Polish) folds into each phase's exit criteria (Wibey pass + a11y).

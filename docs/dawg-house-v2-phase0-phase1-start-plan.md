@@ -12,7 +12,7 @@ Source docs:
 This plan covers only the MVP path:
 
 - Phase 0: foundation fork, boot, telemetry removal, SBC Tech marker, SBC Tech theme.
-- Phase 1: OpenUI generation + inline rendering + interactions + Artifacts canvas.
+- Phase 1: OpenUI generation + inline rendering + interactions.
 
 Do not plan or start phases 2-6 until Phase 0 and Phase 1 are usable as a daily-driver MVP.
 
@@ -41,7 +41,7 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - Manual smoke confirmed: app returns to the expected setup/main state after restart.
 - Automated verification passed: `npm run typecheck`, `npm run test`, `npm run build`, and dev startup probe.
 - Phase 1 is complete enough to move beyond MVP: OpenUI inline rendering,
-  interactions, accessibility pass, and Artifacts canvas are committed.
+  interactions, and accessibility pass are committed.
 - Phase 2 has started: Workshop live view, pause/interrupt controls, and Token
   Pill first pass are committed. One-off sub-agent chat is intentionally parked
   for later.
@@ -317,32 +317,28 @@ Suggested verification:
 - `npm run test`
 - `npm run typecheck`
 
-## Issue 12: Add The Artifacts Canvas Using The Same Renderer
+## Issue 12: Promote Saved Artifacts Out Of Phase 1
 
-Goal: provide the second OpenUI mount point without creating a second engine.
+Goal: keep Phase 1 focused on inline OpenUI, and move Artifacts into a dedicated
+saved-workspace phase.
 
 Work:
 
-- Add a right-rail or side-canvas module inside the hermes-desktop renderer.
-- Reuse the same OpenUI renderer/library from Phase 1 chat work.
-- Add a `Pin to canvas` action on OpenUI messages.
-- Start with one artifact slot; do not add tabs until needed.
-- Default behavior: copy the artifact to the canvas, leaving it in chat history.
+- Do not block Phase 1 closeout on a temporary side canvas.
+- Treat Artifacts as a persistent saved library/tab, like saved screenshots or
+  pictures.
+- Reuse the same OpenUI renderer/library when Artifacts is built later.
+- Update `09_ARTIFACTS.md` as the source of truth for the later phase.
 
 Acceptance criteria:
 
-- Any OpenUI message can be pinned to the canvas.
-- The canvas renders with the same renderer and component library as inline chat.
-- The canvas remains visible while chat scrolls.
-- The canvas is resizable or at least dismissible.
-- Focus order between chat and canvas is sane.
+- Phase 1 exit criteria no longer require pinning.
+- Saved Artifacts is tracked as a later phase/tab.
+- The one-renderer rule remains intact.
 
 Suggested verification:
 
-- Search/build check confirms no duplicate OpenUI renderer/library setup.
-- Manual pin/unpin or pin/replace test.
-- `npm run typecheck`
-- `npm run test`
+- Roadmap docs agree: Phase 1 is inline OpenUI; saved Artifacts is later.
 
 ## MVP Exit Criteria
 
@@ -355,13 +351,13 @@ SBC Tech v2 is ready to move beyond the MVP queue when all of these are true:
 - Chat renders OpenUI inline when content starts with `root =`.
 - Markdown fallback is unchanged.
 - `FollowUps` and `Form` can continue the conversation from inside the generated UI.
-- Artifacts can pin an OpenUI message into a side canvas using the same renderer.
 - `npm run typecheck` passes.
 - Relevant tests pass.
 
 ## Deferred Until After MVP
 
 - Workshop one-off sub-agent chat.
+- Saved Artifacts library/tab.
 - Branching and lineage.
 - PIV.
 - Knowledge Base.
