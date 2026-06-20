@@ -1,6 +1,6 @@
 # 07 — Embedded Terminal + CLI Handoff Lane (Feature ⑧)
 
-> **Phase:** 7 (Terminal Handoff) · **Mechanism:** new screen/component module
+> **Phase:** 6 (Terminal Handoff) · **Mechanism:** new screen/component module
 > binding to hermes-desktop's **real PTY** (`terminal-launcher.ts`) · **Cross-ref:**
 > `02_WORKSHOP` (handoff = manual delegation the Workshop visualizes)
 

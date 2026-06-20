@@ -22,15 +22,15 @@ Then work the feature docs in phase order.
 | 0 — Foundation | `00` §6 |
 | 1 — Signature | `01_OPENUI_INLINE` |
 | 2 — Cockpit | `02_WORKSHOP`, `04_TOKEN_PILL` |
-| 3 — Sub-agent Chat | `02_WORKSHOP` §Phase 3 Follow-up |
-| 4 — Branching | `03_BRANCHING` |
-| 5 — PIV Loop | `05_PIV` |
-| 6 — Knowledge Base | `06_KNOWLEDGE_BASE` |
-| 7 — Terminal Handoff | `07_TERMINAL` |
-| 8 — Prompt Library | `08_PROMPT_LIBRARY` |
-| 9 — Personal Memory Bridge | `11_PERSONAL_MEMORY` |
-| 10 — Workflows | `12_WORKFLOWS` |
-| 11 — Saved Artifacts | `09_ARTIFACTS` |
+| 3 — Branching | `03_BRANCHING` |
+| 4 — PIV Loop | `05_PIV` |
+| 5 — Knowledge Base | `06_KNOWLEDGE_BASE` |
+| 6 — Terminal Handoff | `07_TERMINAL` |
+| 7 — Prompt Library | `08_PROMPT_LIBRARY` |
+| 8 — Personal Memory Bridge | `11_PERSONAL_MEMORY` |
+| 9 — Workflows | `12_WORKFLOWS` |
+| 10 — Saved Artifacts | `09_ARTIFACTS` |
+| 11 — Sub-agent Chat | `02_WORKSHOP` §Phase 11 Follow-up |
 | 12 — Graph (last) | `10_KNOWLEDGE_GRAPH` |
 
 Appendix: `APPENDIX_HERMES_DESKTOP.md` — **base-choice deep dive (GO)**: why we

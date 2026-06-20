@@ -90,17 +90,17 @@ generative UI inline via OpenUI.
 |---|---------|--------|-------|-------|-----|
 | ① | OpenUI inline generative UI (generate + render + interact) | **BUILD** | the signature; renderer branch in `MessageRow` + always-on OpenUI context file; precedent `ClarifyCard` | **1 🎯MVP** | `01` |
 | ② | Workshop pane | **BUILD** | complete: live view + pause/interrupt shipped | 2 ✅ | `02` |
-| ②b | One-off sub-agent chat | **BUILD** | side-channel direct chat with a selected sub-agent; must not hijack the main run | 3 | `02` |
-| ③ | Session branching + lineage tree + Wibey tabs | **BUILD** | new screen; one session model, two entry points | 4 | `03` |
+| ②b | One-off sub-agent chat | **BUILD** | side-channel direct chat with a selected sub-agent; must not hijack the main run | 11 | `02` |
+| ③ | Session branching + lineage tree + Wibey tabs | **BUILD** | new screen; one session model, two entry points | 3 | `03` |
 | ④ | Token / quota header pill | **ADOPT** | complete: header pill + breakdown + threshold state shipped | 2 ✅ | `04` |
-| ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 5 | `05` |
-| ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 6 | `06` |
-| ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 7 | `07` |
-| ⑧ | Prompt library / presets | **BUILD** | seeded from `memory/setting/prompts/`; Favorites parked (`08` §8) | 8 | `08` |
-| ⑨ | Saved Artifacts library | **BUILD** | persistent gallery/tab for generated OpenUI artifacts; shares ① renderer | 11 | `09` |
+| ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 4 | `05` |
+| ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 5 | `06` |
+| ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 6 | `07` |
+| ⑧ | Prompt library / presets | **BUILD** | seeded from `memory/setting/prompts/`; Favorites parked (`08` §8) | 7 | `08` |
+| ⑨ | Saved Artifacts library | **BUILD** | persistent gallery/tab for generated OpenUI artifacts; shares ① renderer | 10 | `09` |
 | ⑩ | Graphiti knowledge graph + Timeline | **BUILD** | the one heavy dep (Neo4j); criteria-first | 12 (last) | `10` |
-| ⑪ | Personal Memory bridge | **ADOPT** | adopt hermes-desktop Memory UI + providers + SOUL.md; port only `/profile /daily /notes /memory` ergonomics | 9 | `11` |
-| ⑫ | Workflows (build + execute) | **EXTEND** | extends existing cron/schedules; skill + slash + checkpoints | 10 | `12` |
+| ⑪ | Personal Memory bridge | **ADOPT** | adopt hermes-desktop Memory UI + providers + SOUL.md; port only `/profile /daily /notes /memory` ergonomics | 8 | `11` |
+| ⑫ | Workflows (build + execute) | **EXTEND** | extends existing cron/schedules; skill + slash + checkpoints | 9 | `12` |
 
 > **MVP = ① (Phase 1) on the Phase-0 foundation.** Saved Artifacts is no longer
 > a Phase-1 gate; it is promoted to its own later workspace/library phase.
@@ -127,21 +127,21 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 | **0 — Foundation** 🎯MVP | Fork `hermes-desktop` + pin + strip telemetry + boot `electron-vite dev` + hello-component + SBC Tech skin | A working SBC Tech-skinned desktop app (loop proven) |
 | **1 — Signature** 🎯MVP | OpenUI inline ① (generate + render + interact) | Generative UI in chat |
 | **2 — Cockpit** ✅ | Workshop ② + Token Pill ④ | Closed: orchestrator view + usage state shipped |
-| **3 — Sub-agent Chat** | One-off side-channel chat with a selected sub-agent ②b | Direct steer without hijacking the main run |
-| **4 — Branching** | Session branching + lineage tree ③ | Fork conversations into navigable timelines |
-| **5 — PIV Loop** | Plan → Implement → Validate ⑤ | Reviewable, checkpointed work loop |
-| **6 — Knowledge Base** | Upload + URL ingest + viewer + hybrid search ⑥ | Searchable reference corpus |
-| **7 — Terminal Handoff** | Embedded terminal + Send to CLI ⑦ | Hermes → opencode/CLI lane |
-| **8 — Prompt Library** | Saved prompts + variables + chat picker ⑧ | Reusable kickoff library |
-| **9 — Personal Memory Bridge** | `/profile /daily /notes /memory` ergonomics ⑪ | Francis memory muscle memory on Hermes primitives |
-| **10 — Workflows** | Skill-authored workflows + checkpoints + schedules ⑫ | Repeatable procedures |
-| **11 — Saved Artifacts** | Persistent generated UI gallery/tab ⑨ | Saved dashboards/reports/cards |
+| **3 — Branching** | Session branching + lineage tree ③ | Fork conversations into navigable timelines |
+| **4 — PIV Loop** | Plan → Implement → Validate ⑤ | Reviewable, checkpointed work loop |
+| **5 — Knowledge Base** | Upload + URL ingest + viewer + hybrid search ⑥ | Searchable reference corpus |
+| **6 — Terminal Handoff** | Embedded terminal + Send to CLI ⑦ | Hermes → opencode/CLI lane |
+| **7 — Prompt Library** | Saved prompts + variables + chat picker ⑧ | Reusable kickoff library |
+| **8 — Personal Memory Bridge** | `/profile /daily /notes /memory` ergonomics ⑪ | Francis memory muscle memory on Hermes primitives |
+| **9 — Workflows** | Skill-authored workflows + checkpoints + schedules ⑫ | Repeatable procedures |
+| **10 — Saved Artifacts** | Persistent generated UI gallery/tab ⑨ | Saved dashboards/reports/cards |
+| **11 — Sub-agent Chat** | One-off side-channel chat with a selected sub-agent ②b | Direct steer without hijacking the main run |
 | **12 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
 
 > Polish is not a numbered phase. Wibey pass + a11y fold into each phase's exit criteria.
 > Phase 2 is closed. Workshop read-only, pause, and interrupt are shipped; Token
 > Pill first pass is shipped. One-off sub-agent chat is deliberately split into
-> Phase 3 and is not part of Phase 2 closeout.
+> Phase 11 and is not part of Phase 2 closeout.
 
 ### Development Tracking Candidate
 
@@ -202,9 +202,9 @@ cold:
   interactions, and accessibility pass are committed and manually smoke-verified.
 - **Phase 2 — Cockpit:** complete and closed. Workshop live view,
   pause/interrupt controls, and Token Pill first pass are committed. One-off
-  sub-agent chat is split into its own Phase 3.
-- **Next major phase:** Phase 3 — Sub-agent Chat, unless a short stabilization
-  pass is chosen first. Branching is now Phase 4.
+  sub-agent chat is pushed to Phase 11.
+- **Next major phase:** Phase 3 — Branching, unless a short stabilization pass is
+  chosen first. One-off sub-agent chat is intentionally pushed to Phase 11.
 
 ### Original handoff status
 

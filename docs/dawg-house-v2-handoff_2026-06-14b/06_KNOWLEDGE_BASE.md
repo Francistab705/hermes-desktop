@@ -1,6 +1,6 @@
 # 06 — Knowledge Base: Upload + Hybrid Search + Viewer (Feature ⑥)
 
-> **Phase:** 6 (Knowledge Base) · **Mechanism:** **EXTEND** the existing search +
+> **Phase:** 5 (Knowledge Base) · **Mechanism:** **EXTEND** the existing search +
 > new screen/component module in the fork
 > (no fork) · **Source:** DAWG House Epics 18/22 (KB doc viewer, KB services)
 

@@ -1,6 +1,6 @@
 # 03 — Session Branching + Lineage Tree (Feature ③)
 
-> **Phase:** 4 (Branching) · **Mechanism:** new screen/component module in the fork ·
+> **Phase:** 3 (Branching) · **Mechanism:** new screen/component module in the fork ·
 > **Source:** DAWG House Epic 23 (dynamic session branching, ADR 0002 no-merge stance)
 
 ---

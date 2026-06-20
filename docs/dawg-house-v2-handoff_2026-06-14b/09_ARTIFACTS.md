@@ -1,6 +1,6 @@
 # 09 — Saved Artifacts Library (Feature ⑨)
 
-> **Phase:** 11 (Saved Artifacts) · **Mechanism:** new screen/component module that
+> **Phase:** 10 (Saved Artifacts) · **Mechanism:** new screen/component module that
 > **shares the OpenUI renderer** (no second engine) · **Status:** promoted out of
 > Phase 1; build later as a persistent library/tab.
 

@@ -2,7 +2,7 @@
 
 > **Phase:** 2 (Cockpit) · **Mechanism:** new screen/component module in the fork ·
 > **Status:** Phase 2 closed. Live view + pause/interrupt shipped; one-off
-> sub-agent chat split into Phase 3.
+> sub-agent chat pushed to Phase 11.
 
 ---
 
@@ -16,7 +16,7 @@ bar applies here most of all:** no modal gauntlets, instant feedback, live
 stream.
 
 One-off direct chat with a selected sub-agent is intentionally split into its own
-Phase 3 steering pass. It is not required for Phase 2 closure, and Phase 2 is now
+Phase 11 steering pass. It is not required for Phase 2 closure, and Phase 2 is now
 closed.
 
 ---
@@ -54,11 +54,11 @@ No new orchestration. We consume what `delegate_tool.py` already emits.
 | 2.6 | Commit read-only Workshop | ✅ shipped in `ced1a1c` |
 | 2.7 | Add Pause / Interrupt buttons wired to `delegation.pause` + `subagent.interrupt` | ✅ shipped in `033884f` |
 
-### Phase 3 Follow-up
+### Phase 11 Follow-up
 
 | Step | Do | Proves |
 |------|-----|--------|
-| 3.1 | One-off direct chat with a selected sub-agent (side-channel, not a detour) | Direct steer works without hijacking the main run. |
+| 11.1 | One-off direct chat with a selected sub-agent (side-channel, not a detour) | Direct steer works without hijacking the main run. |
 
 ---
 
@@ -81,11 +81,11 @@ All plugin. **Zero backend edits.**
   reload.
 - ✅ Read-only path shipped before controls.
 - ✅ Pause/interrupt call the real RPCs.
-- ➡️ One-off chat is Phase 3 and must be side-channel when built; it must not
+- ➡️ One-off chat is Phase 11 and must be side-channel when built; it must not
   hijack the main run.
 - ✅ WCAG 2.2 AA; respects `prefers-reduced-motion` for any animated edges.
 
-**Phase 2 closeout:** accepted. Move to Phase 3 when ready.
+**Phase 2 closeout:** accepted. Move to Phase 3 Branching when ready.
 
 ---
 
