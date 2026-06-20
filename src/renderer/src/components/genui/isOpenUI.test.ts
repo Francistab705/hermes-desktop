@@ -20,8 +20,26 @@ describe("isOpenUI", () => {
     );
   });
 
-  it("rejects markdown content", () => {
-    expect(isOpenUI("# Root\n\n```openui\nroot = Stack()\n```")).toBe(false);
+  it("recovers an embedded fenced response from extra model text", () => {
+    expect(isOpenUI("# Root\n\n```openui\nroot = Stack()\n```")).toBe(true);
+    expect(getOpenUIResponse("# Root\n\n```openui\nroot = Stack()\n```")).toBe(
+      "root = Stack()",
+    );
+  });
+
+  it("uses the last valid fenced block when earlier output is malformed", () => {
+    expect(
+      getOpenUIResponse(
+        [
+          "```openui",
+          "Stack()",
+          "```",
+          "```openui",
+          "root = Stack()",
+          "```",
+        ].join("\n"),
+      ),
+    ).toBe("root = Stack()");
   });
 
   it("rejects bare OpenUI code without an explicit fence", () => {

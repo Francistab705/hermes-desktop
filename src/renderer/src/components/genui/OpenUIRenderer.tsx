@@ -8,6 +8,9 @@ import { genUIComponents } from "./components";
 /** Matches a complete fenced openui/genui block (opening + closing fence). */
 const OPENUI_FENCE_RE = /^\s*```(?:openui|genui)\s*\r?\n([\s\S]*?)\r?\n```\s*$/i;
 
+/** Matches complete fenced openui/genui blocks embedded in extra model text. */
+const OPENUI_EMBEDDED_FENCE_RE = /```(?:openui|genui)\s*\r?\n([\s\S]*?)\r?\n```/gi;
+
 /** Matches just the opening fence — used for streaming detection. */
 const OPENUI_OPEN_FENCE_RE = /^\s*```(?:openui|genui)\s*\r?\n([\s\S]*)$/i;
 
@@ -16,9 +19,18 @@ const OPENUI_OPEN_FENCE_RE = /^\s*```(?:openui|genui)\s*\r?\n([\s\S]*)$/i;
  * Returns null if the content is not a whole-message fenced openui block.
  */
 export function getOpenUIResponse(value: string | null | undefined): string | null {
-  const match = OPENUI_FENCE_RE.exec(value ?? "");
+  const text = value ?? "";
+  const match = OPENUI_FENCE_RE.exec(text);
   const response = match?.[1].trim();
-  return response && /^root\s*=/.test(response) ? response : null;
+  if (response && /^root\s*=/.test(response)) return response;
+
+  const matches = [...text.matchAll(OPENUI_EMBEDDED_FENCE_RE)];
+  for (const embedded of matches.reverse()) {
+    const embeddedResponse = embedded[1].trim();
+    if (/^root\s*=/.test(embeddedResponse)) return embeddedResponse;
+  }
+
+  return null;
 }
 
 export interface StreamingOpenUIResult {
@@ -51,6 +63,9 @@ export function getStreamingOpenUIResponse(
     }
     return null;
   }
+
+  const embedded = getOpenUIResponse(text);
+  if (embedded) return { response: embedded, isStreaming: false };
 
   // During streaming, the closing fence hasn't arrived yet.
   if (!pending) return null;
