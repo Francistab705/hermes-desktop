@@ -50,9 +50,9 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - Automated verification passed: `npm run typecheck`, `npm run test`, `npm run build`, and dev startup probe.
 - Phase 1 is complete: OpenUI inline rendering, interactions, and accessibility
   pass are committed and smoke-verified.
-- Phase 2 has started: Workshop live view, pause/interrupt controls, and Token
-  Pill first pass are committed. One-off sub-agent chat is intentionally parked
-  for later.
+- Phase 2 is closed: Workshop live view, pause/interrupt controls, and Token Pill
+  first pass are committed. One-off sub-agent chat is intentionally split into
+  Phase 3.
 - Next major roadmap item is Phase 3: Sub-agent Chat, unless a stabilization pass
   is chosen first. Branching follows as Phase 4.
 

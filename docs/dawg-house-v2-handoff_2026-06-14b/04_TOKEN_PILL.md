@@ -2,7 +2,7 @@
 
 > **Phase:** 2 (Cockpit) · **Mechanism:** **ADOPT + restyle** the existing
 > hermes-desktop token footer (do NOT rebuild) · extend only with quota/breakdown
-> **Status:** first header-pill pass shipped in `033884f`.
+> **Status:** Phase 2 closed. First header-pill pass shipped in `033884f`.
 
 ---
 
@@ -68,6 +68,9 @@ Anthropic API).
 Note: remaining-quota semantics are still provider-dependent. The shipped pill
 shows "Unknown quota" when the provider does not expose a reliable remaining
 quota value.
+
+**Phase 2 closeout:** accepted. Further quota-provider precision is polish, not a
+Phase 2 blocker.
 
 ---
 

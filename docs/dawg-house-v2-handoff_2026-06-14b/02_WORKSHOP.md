@@ -1,8 +1,8 @@
 # 02 — Workshop Pane (Feature ②)
 
 > **Phase:** 2 (Cockpit) · **Mechanism:** new screen/component module in the fork ·
-> **Status:** live view + pause/interrupt shipped; one-off sub-agent chat split
-> into Phase 3.
+> **Status:** Phase 2 closed. Live view + pause/interrupt shipped; one-off
+> sub-agent chat split into Phase 3.
 
 ---
 
@@ -16,7 +16,8 @@ bar applies here most of all:** no modal gauntlets, instant feedback, live
 stream.
 
 One-off direct chat with a selected sub-agent is intentionally split into its own
-Phase 3 steering pass. It is not required for Phase 2 closure.
+Phase 3 steering pass. It is not required for Phase 2 closure, and Phase 2 is now
+closed.
 
 ---
 
@@ -83,6 +84,8 @@ All plugin. **Zero backend edits.**
 - ➡️ One-off chat is Phase 3 and must be side-channel when built; it must not
   hijack the main run.
 - ✅ WCAG 2.2 AA; respects `prefers-reduced-motion` for any animated edges.
+
+**Phase 2 closeout:** accepted. Move to Phase 3 when ready.
 
 ---
 

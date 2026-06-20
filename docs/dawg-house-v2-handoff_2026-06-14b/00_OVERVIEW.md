@@ -89,10 +89,10 @@ generative UI inline via OpenUI.
 | # | Feature | Status | Notes | Phase | Doc |
 |---|---------|--------|-------|-------|-----|
 | ① | OpenUI inline generative UI (generate + render + interact) | **BUILD** | the signature; renderer branch in `MessageRow` + always-on OpenUI context file; precedent `ClarifyCard` | **1 🎯MVP** | `01` |
-| ② | Workshop pane | **BUILD** | live view + pause/interrupt shipped | 2 | `02` |
+| ② | Workshop pane | **BUILD** | complete: live view + pause/interrupt shipped | 2 ✅ | `02` |
 | ②b | One-off sub-agent chat | **BUILD** | side-channel direct chat with a selected sub-agent; must not hijack the main run | 3 | `02` |
 | ③ | Session branching + lineage tree + Wibey tabs | **BUILD** | new screen; one session model, two entry points | 4 | `03` |
-| ④ | Token / quota header pill | **ADOPT** | first header-pill pass shipped; click breakdown + threshold state | 2 | `04` |
+| ④ | Token / quota header pill | **ADOPT** | complete: header pill + breakdown + threshold state shipped | 2 ✅ | `04` |
 | ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 5 | `05` |
 | ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 6 | `06` |
 | ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 7 | `07` |
@@ -126,7 +126,7 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 |-------|-------|----------|
 | **0 — Foundation** 🎯MVP | Fork `hermes-desktop` + pin + strip telemetry + boot `electron-vite dev` + hello-component + SBC Tech skin | A working SBC Tech-skinned desktop app (loop proven) |
 | **1 — Signature** 🎯MVP | OpenUI inline ① (generate + render + interact) | Generative UI in chat |
-| **2 — Cockpit** | Workshop ② + Token Pill ④ | Watch the orchestrator + usage state |
+| **2 — Cockpit** ✅ | Workshop ② + Token Pill ④ | Closed: orchestrator view + usage state shipped |
 | **3 — Sub-agent Chat** | One-off side-channel chat with a selected sub-agent ②b | Direct steer without hijacking the main run |
 | **4 — Branching** | Session branching + lineage tree ③ | Fork conversations into navigable timelines |
 | **5 — PIV Loop** | Plan → Implement → Validate ⑤ | Reviewable, checkpointed work loop |
@@ -139,8 +139,9 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 | **12 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
 
 > Polish is not a numbered phase. Wibey pass + a11y fold into each phase's exit criteria.
-> Workshop read-only, pause, and interrupt are shipped. One-off sub-agent chat is
-> deliberately split into Phase 3 and is not required to close Phase 2.
+> Phase 2 is closed. Workshop read-only, pause, and interrupt are shipped; Token
+> Pill first pass is shipped. One-off sub-agent chat is deliberately split into
+> Phase 3 and is not part of Phase 2 closeout.
 
 ### Development Tracking Candidate
 
@@ -199,9 +200,9 @@ cold:
 - **Phase 0 — Foundation:** complete and committed.
 - **Phase 1 — Signature MVP:** complete. OpenUI inline generation/rendering,
   interactions, and accessibility pass are committed and manually smoke-verified.
-- **Phase 2 — Cockpit:** mostly complete. Workshop live view, pause/interrupt
-  controls, and Token Pill first pass are committed. One-off sub-agent chat is
-  split into its own Phase 3.
+- **Phase 2 — Cockpit:** complete and closed. Workshop live view,
+  pause/interrupt controls, and Token Pill first pass are committed. One-off
+  sub-agent chat is split into its own Phase 3.
 - **Next major phase:** Phase 3 — Sub-agent Chat, unless a short stabilization
   pass is chosen first. Branching is now Phase 4.
 
