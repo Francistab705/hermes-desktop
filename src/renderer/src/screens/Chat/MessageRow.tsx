@@ -149,6 +149,10 @@ interface MessageRowProps {
   isLoading: boolean;
   onApprove: () => void;
   onDeny: () => void;
+  /** Send a message into the chat pipeline (used by GenUI FollowUps/Form). */
+  onSendMessage?: (text: string) => void;
+  /** Pin an OpenUI response to the Artifacts canvas. */
+  onPinArtifact?: (response: string) => void;
   /** False on continuation rows of a turn — render a spacer instead of the
    *  avatar so the turn reads as one grouped block. Defaults to true. */
   showAvatar?: boolean;
@@ -160,6 +164,8 @@ export const MessageRow = memo(function MessageRow({
   isLoading,
   onApprove,
   onDeny,
+  onSendMessage: _onSendMessage,
+  onPinArtifact: _onPinArtifact,
   showAvatar = true,
 }: MessageRowProps): React.JSX.Element {
   const { t } = useI18n();

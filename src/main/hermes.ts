@@ -443,6 +443,16 @@ async function waitForDashboardReady(
   throw new Error("Hermes dashboard gateway did not become ready");
 }
 
+/** True for the gateway events the Workshop's delegation tree cares about:
+ *  any `subagent.*` event, or a `delegate_task` tool start/complete. */
+function isDelegationEvent(event: GatewayEvent): boolean {
+  return (
+    event.type.startsWith("subagent.") ||
+    ((event.type === "tool.start" || event.type === "tool.complete") &&
+      event.payload?.name === "delegate_task")
+  );
+}
+
 class TuiGatewayClient {
   private handlers = new Set<GatewayEventHandler>();
   private nextId = 0;
@@ -450,6 +460,12 @@ class TuiGatewayClient {
   private port = 0;
   private proc: ChildProcess | null = null;
   private recentEvents: GatewayEvent[] = [];
+  // Dedicated buffer for delegation/subagent events. Kept separate from
+  // `recentEvents` because a delegating turn fires dozens of regular tool
+  // events (web_search, read_file, …) per subagent, which would otherwise
+  // evict the lower-frequency `subagent.*` / `delegate_task` events from the
+  // shared 50-slot ring before the Workshop's 5s poll can observe them.
+  private recentDelegationEvents: GatewayEvent[] = [];
   private ready: Promise<void> | null = null;
   private readyReject: ((error: Error) => void) | null = null;
   private readyResolve: (() => void) | null = null;
@@ -474,6 +490,14 @@ class TuiGatewayClient {
       if (predicate(event)) return event;
     }
     return null;
+  }
+
+  recentEventSnapshot(): GatewayEvent[] {
+    return [...this.recentEvents];
+  }
+
+  recentDelegationEventSnapshot(): GatewayEvent[] {
+    return [...this.recentDelegationEvents];
   }
 
   async request<T>(
@@ -669,6 +693,17 @@ class TuiGatewayClient {
     if (this.recentEvents.length > 50) {
       this.recentEvents.splice(0, this.recentEvents.length - 50);
     }
+    // Also capture delegation/subagent events in a dedicated buffer that the
+    // high-volume regular tool events can't evict (see field comment).
+    if (isDelegationEvent(frame.params)) {
+      this.recentDelegationEvents.push(frame.params);
+      if (this.recentDelegationEvents.length > 200) {
+        this.recentDelegationEvents.splice(
+          0,
+          this.recentDelegationEvents.length - 200,
+        );
+      }
+    }
     if (frame.params.type === "gateway.ready") {
       this.readyResolve?.();
     }
@@ -817,6 +852,103 @@ function stopTuiGatewayClient(profile?: string): void {
   if (!client) return;
   client.stop();
   tuiGatewayClients.delete(key);
+}
+
+export interface TuiDelegationStatus {
+  active?: unknown[];
+  paused?: boolean;
+  max_spawn_depth?: number;
+  max_concurrent_children?: number;
+}
+
+export async function getTuiDelegationStatus(
+  profile?: string,
+): Promise<TuiDelegationStatus> {
+  if (isRemoteMode()) {
+    throw new Error(
+      "Workshop delegation status is only available for local profiles.",
+    );
+  }
+  if (!shouldUseTuiGatewayClient()) {
+    return { active: [], paused: false };
+  }
+  return getTuiGatewayClient(profile).request<TuiDelegationStatus>(
+    "delegation.status",
+    {},
+    10_000,
+  );
+}
+
+export function getTuiRecentDelegationEvents(profile?: string): GatewayEvent[] {
+  const client = tuiGatewayClients.get(profileKey(profile));
+  if (!client) return [];
+  // Read from the dedicated delegation buffer, which the high-volume regular
+  // tool events can't evict (unlike the shared recentEvents ring).
+  return client.recentDelegationEventSnapshot();
+}
+
+// ── Spawn-tree (delegation) history ──────────────────────────────────
+// Hermes persists delegation trees to $HERMES_HOME/spawn-trees via the
+// dashboard gateway's spawn_tree.{save,list,load} RPCs. These wrappers let
+// the desktop save a finished run and browse/reopen past ones.
+
+export interface SpawnTreeListEntry {
+  path?: string;
+  session_id?: string;
+  finished_at?: number;
+  started_at?: number;
+  label?: string;
+  count?: number;
+}
+
+export async function saveTuiSpawnTree(
+  profile: string | undefined,
+  payload: {
+    session_id?: string;
+    subagents: unknown[];
+    started_at?: number;
+    finished_at?: number;
+    label?: string;
+  },
+): Promise<{ path?: string; session_id?: string }> {
+  if (isRemoteMode() || !shouldUseTuiGatewayClient()) return {};
+  return getTuiGatewayClient(profile).request<{
+    path?: string;
+    session_id?: string;
+  }>("spawn_tree.save", payload, 10_000);
+}
+
+export async function listTuiSpawnTrees(
+  profile?: string,
+): Promise<SpawnTreeListEntry[]> {
+  if (isRemoteMode()) {
+    throw new Error("Workshop history is only available for local profiles.");
+  }
+  if (!shouldUseTuiGatewayClient()) return [];
+  const result = await getTuiGatewayClient(profile).request<{
+    entries?: SpawnTreeListEntry[];
+  }>("spawn_tree.list", { cross_session: true, limit: 50 }, 10_000);
+  return Array.isArray(result.entries) ? result.entries : [];
+}
+
+export async function loadTuiSpawnTree(
+  profile: string | undefined,
+  path: string,
+): Promise<{
+  session_id?: string;
+  started_at?: number;
+  finished_at?: number;
+  label?: string;
+  subagents?: unknown[];
+}> {
+  if (isRemoteMode()) {
+    throw new Error("Workshop history is only available for local profiles.");
+  }
+  return getTuiGatewayClient(profile).request(
+    "spawn_tree.load",
+    { path },
+    10_000,
+  );
 }
 
 const CAPABILITIES_TIMEOUT_MS = 350;
@@ -1085,6 +1217,41 @@ export function contextFolderSystemMessage(
       `absolute paths under this folder.`,
   };
 }
+
+export const OPENUI_SYSTEM_INSTRUCTIONS = `Hermes Desktop can render rich assistant UI when your entire final answer is exactly one fenced OpenUI Lang block.
+
+Use OpenUI when the user asks for GenUI, OpenUI, a visual UI, a dashboard, a work summary UI, cards, rich layout, or when a structured visual answer is helpful. Otherwise answer normally in markdown.
+
+Never output raw HTML, inline CSS, JSX, XML, SVG, or angle-bracket UI markup for visual answers. If you cannot produce valid OpenUI Lang, fall back to plain markdown rather than HTML/CSS.
+
+OpenUI contract:
+- The whole assistant message must be a single markdown fence with language openui.
+- Do not put prose before or after the fence.
+- Inside the fence, use OpenUI Lang assignment syntax only, never JSX, XML, HTML, CSS, SVG, or angle-bracket tags.
+- The first statement inside the fence must assign root.
+- Compose children by assigning variables and passing arrays.
+
+Available OpenUI components:
+- Stack(children)
+- Callout(title, body)
+- StatTile(label, value, change?)
+- KPIRow(tiles)
+- DataTable(columns, rows)
+- PlanCard(title, steps)
+- FollowUps(prompts) - clicking sends the prompt as a new chat message
+- Form(title, fields) - submitting sends field values as a new chat message
+- AgentStatus(phase, status, detail?)
+- RiskList(title, risks)
+- ToolSummary(title, tools) where tools is [{ name, outcome }]
+- FileChangeCard(title, files, summary?)
+
+Valid example:
+\`\`\`openui
+root = Stack([status, risks, followups])
+status = AgentStatus("Review", "Ready", "OpenUI is wired into chat.")
+risks = RiskList("Known limits", ["Follow-up buttons are visual only", "Forms are disabled"])
+followups = FollowUps(["Show risks", "Draft next slice"])
+\`\`\``;
 
 function reasoningEffortForProfile(
   profile?: string,
