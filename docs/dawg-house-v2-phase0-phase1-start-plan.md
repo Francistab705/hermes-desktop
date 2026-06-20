@@ -40,8 +40,13 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - The `sbc-tech` theme is registered in the theme registry and is the default dark theme for new installs.
 - Manual smoke confirmed: app returns to the expected setup/main state after restart.
 - Automated verification passed: `npm run typecheck`, `npm run test`, `npm run build`, and dev startup probe.
-- Next session should start Phase 1 at Issue 6: add `@openuidev/react-lang`, create the shared renderer module, and test the `isOpenUI` detector before changing chat rendering.
-- Do not start phases 2-6 until Phase 1 inline OpenUI plus Artifacts is usable as the daily-driver MVP.
+- Phase 1 is complete enough to move beyond MVP: OpenUI inline rendering,
+  interactions, accessibility pass, and Artifacts canvas are committed.
+- Phase 2 has started: Workshop live view, pause/interrupt controls, and Token
+  Pill first pass are committed. One-off sub-agent chat is intentionally parked
+  for later.
+- Next major roadmap item is Phase 3: Branching + PIV, unless a stabilization
+  pass is chosen first.
 
 ## Pinned Fork Base
 
@@ -356,8 +361,7 @@ SBC Tech v2 is ready to move beyond the MVP queue when all of these are true:
 
 ## Deferred Until After MVP
 
-- Workshop pane.
-- Token pill restyle.
+- Workshop one-off sub-agent chat.
 - Branching and lineage.
 - PIV.
 - Knowledge Base.

@@ -1,18 +1,21 @@
 # 02 — Workshop Pane (Feature ②)
 
 > **Phase:** 2 (Cockpit) · **Mechanism:** new screen/component module in the fork ·
-> **Ships read-only FIRST**; pause/interrupt + one-off sub-agent chat = phase 2.
+> **Status:** live view + pause/interrupt shipped; one-off sub-agent chat parked.
 
 ---
 
 ## 1. What & why
 
 The Workshop is a window onto the orchestrator's brain: watch the main agent
-delegate to sub-agents, see the traffic between them, and (phase 2) intervene —
-pause a delegation, interrupt a sub-agent, or open a one-off direct chat with a
-sub-agent. It's the cockpit that makes the "orchestrator + specialized CLIs"
-vision visible and steerable. **Wibey quality bar applies here most of all:** no
-modal gauntlets, instant feedback, live stream.
+delegate to sub-agents, see the traffic between them, pause new delegation
+spawns, and interrupt a running sub-agent. It's the cockpit that makes the
+"orchestrator + specialized CLIs" vision visible and steerable. **Wibey quality
+bar applies here most of all:** no modal gauntlets, instant feedback, live
+stream.
+
+One-off direct chat with a selected sub-agent is intentionally parked for a later
+steering pass. It is not required for Phase 2 closure.
 
 ---
 
@@ -22,8 +25,7 @@ modal gauntlets, instant feedback, live stream.
 - **Agent API via the desktop main process / IPC** — stream `delegation.status` through hermes-desktop's main-process client (same path `run-stream.ts`/`dashboardEventAdapter.ts` use), surfaced via `window.hermesAPI`. (No `buildWsUrl` — that was the `web/` plugin SDK.)
 - **ACP adapter** (`acp_adapter/`) — Hermes speaks Agent Client Protocol; the
   Workshop is a viewer onto ACP/delegation events.
-- Phase 2 intervention: **`delegation.pause`** + **`subagent.interrupt`** RPCs
-  (already exist — we just call them).
+- Phase 2 intervention: **`delegation.pause`** + **`subagent.interrupt`** RPCs.
 
 No new orchestration. We consume what `delegate_tool.py` already emits.
 
@@ -38,20 +40,23 @@ No new orchestration. We consume what `delegate_tool.py` already emits.
 
 ---
 
-## 4. Build steps (read-only first)
+## 4. Build steps
 
 | Step | Do | Proves |
 |------|-----|--------|
-| 2.1 | Register a `Workshop` page + header-left nav link | Plugin page mounts |
-| 2.2 | Open `buildWsUrl` to `delegation.status`, log frames | Live traffic arrives |
-| 2.3 | Render a delegation tree: main agent → sub-agents, with live status badges | Orchestration is visible |
-| 2.4 | Render per-delegation message stream (read-only) | You can watch a sub-agent work |
-| 2.5 | a11y + Wibey pass (no reloads, live updates, reduced-motion) | Quality bar met |
-| 2.6 | Commit (read-only Workshop done) | Phase 1 of feature shipped |
+| 2.1 | Register a `Workshop` page + header-left nav link | ✅ page mounts |
+| 2.2 | Read delegation status through the desktop main process / dashboard RPC path | ✅ live traffic arrives |
+| 2.3 | Render a delegation tree: main agent → sub-agents, with live status badges | ✅ orchestration is visible |
+| 2.4 | Render per-delegation message stream | ✅ you can watch a sub-agent work |
+| 2.5 | a11y + Wibey pass (no reloads, live updates, reduced-motion) | ✅ baseline quality met |
+| 2.6 | Commit read-only Workshop | ✅ shipped in `ced1a1c` |
+| 2.7 | Add Pause / Interrupt buttons wired to `delegation.pause` + `subagent.interrupt` | ✅ shipped in `033884f` |
 
-### Phase 2 of the feature (after read-only ships)
-| 2.7 | Add Pause / Interrupt buttons wired to `delegation.pause` + `subagent.interrupt` | Intervention works |
-| 2.8 | One-off direct chat with a selected sub-agent (side-channel, not a detour) | Direct steer works |
+### Parked
+
+| Step | Do | Why parked |
+|------|-----|------------|
+| 2.8 | One-off direct chat with a selected sub-agent (side-channel, not a detour) | Useful, but not needed for the current cockpit. Save for a later steering pass. |
 
 ---
 
@@ -72,9 +77,10 @@ All plugin. **Zero backend edits.**
 - ✅ Workshop page reachable from a header-left nav link.
 - ✅ Live `delegation.status` stream renders a delegation tree that updates without
   reload.
-- ✅ Read-only first: no pause/interrupt buttons until the read path is solid.
-- ✅ Phase 2: pause/interrupt call the real RPCs; one-off chat is a side-channel
-  that doesn't hijack the main run.
+- ✅ Read-only path shipped before controls.
+- ✅ Pause/interrupt call the real RPCs.
+- ⏸️ One-off chat is parked and must be side-channel when built; it must not hijack
+  the main run.
 - ✅ WCAG 2.2 AA; respects `prefers-reduced-motion` for any animated edges.
 
 ---

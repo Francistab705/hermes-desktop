@@ -87,9 +87,9 @@ generative UI inline via OpenUI.
 | # | Feature | Status | Notes | Phase | Doc |
 |---|---------|--------|-------|-------|-----|
 | ① | OpenUI inline generative UI (generate + render + interact) | **BUILD** | the signature; renderer branch in `MessageRow` + always-on OpenUI context file; precedent `ClarifyCard` | **1 🎯MVP** | `01` |
-| ② | Workshop pane (read-only first) | **BUILD** | reads `delegation.status` via desktop main/IPC | 2 | `02` |
+| ② | Workshop pane | **BUILD** | live view + pause/interrupt shipped; one-off sub-agent chat parked | 2 | `02` |
 | ③ | Session branching + lineage tree + Wibey tabs | **BUILD** | new screen; one session model, two entry points | 3 | `03` |
-| ④ | Token / quota header pill | **ADOPT** | hermes-desktop already has a token footer — restyle + add breakdown | 2 | `04` |
+| ④ | Token / quota header pill | **ADOPT** | first header-pill pass shipped; click breakdown + threshold state | 2 | `04` |
 | ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 3 | `05` |
 | ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 4 | `06` |
 | ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 4 | `07` |
@@ -126,9 +126,9 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 | **4 — Knowledge & tools** | KB ⑥ + terminal ⑦ + prompts ⑧ + memory ⑪ + workflows ⑫ | The analyst toolkit + Francis's brain |
 | **6 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
 
-> Phase 5 (Polish) folds into each phase's exit criteria (Wibey pass + a11y). The
-> Workshop's pause/interrupt powers (`delegation.pause`, `subagent.interrupt`) and
-> one-off sub-agent chat are **Workshop phase 2** — after read-only ships.
+> Phase 5 (Polish) folds into each phase's exit criteria (Wibey pass + a11y).
+> Workshop read-only, pause, and interrupt are shipped. One-off sub-agent chat is
+> deliberately parked for later and is not required to close Phase 2.
 
 ---
 
@@ -172,6 +172,19 @@ cold:
 ---
 
 ## 8. Status & open items
+
+### Current build status (2026-06-19)
+
+- **Phase 0 — Foundation:** complete and committed.
+- **Phase 1 — Signature MVP:** complete enough to move beyond MVP; OpenUI inline,
+  interactions, accessibility pass, and Artifacts canvas are committed.
+- **Phase 2 — Cockpit:** mostly complete. Workshop live view, pause/interrupt
+  controls, and Token Pill first pass are committed. One-off sub-agent chat is
+  parked for a later steering pass.
+- **Next major phase:** Phase 3 — Branching + PIV, unless a stabilization pass is
+  chosen first.
+
+### Original handoff status
 
 - **Scope:** COMPLETE and locked. 12 features, feasibility proven against real code
   (upstream: `delegate_tool`, `session_search`, `checkpoint_manager`, `blueprints`;

@@ -2,6 +2,7 @@
 
 > **Phase:** 2 (Cockpit) · **Mechanism:** **ADOPT + restyle** the existing
 > hermes-desktop token footer (do NOT rebuild) · extend only with quota/breakdown
+> **Status:** first header-pill pass shipped in `033884f`.
 
 ---
 
@@ -39,12 +40,12 @@ Anthropic API).
 
 | Step | Do | Proves |
 |------|-----|--------|
-| 4.1 | Register `TokenPill` in `header-right` | Pill renders in header |
-| 4.2 | Wire to the usage/analytics read | Live numbers appear |
-| 4.3 | Click → popover breakdown (per-model, remaining quota) | Detail works |
-| 4.4 | Threshold color states (ok / warn / critical) using DAWG theme semantic tokens | At-a-glance burn |
-| 4.5 | a11y: `aria-label`, contrast AA, non-color signal for state | WCAG 2.2 AA |
-| 4.6 | Commit | Done |
+| 4.1 | Mount `TokenPill` in the Chat header | ✅ pill renders in header |
+| 4.2 | Wire to existing chat usage/context state | ✅ live numbers appear when usage is available |
+| 4.3 | Click → popover breakdown (provider/model/context/cache/cost) | ✅ detail works |
+| 4.4 | Threshold color states (ok / warn / critical) using semantic tokens | ✅ at-a-glance burn |
+| 4.5 | a11y: `aria-label`, contrast AA, non-color signal for state | ✅ baseline WCAG pass |
+| 4.6 | Commit | ✅ shipped in `033884f` |
 
 ---
 
@@ -63,6 +64,10 @@ Anthropic API).
 - ✅ Click reveals a per-model / quota breakdown.
 - ✅ Color state has a non-color companion cue (icon/text) for a11y.
 - ✅ WCAG 2.2 AA.
+
+Note: remaining-quota semantics are still provider-dependent. The shipped pill
+shows "Unknown quota" when the provider does not expose a reliable remaining
+quota value.
 
 ---
 
