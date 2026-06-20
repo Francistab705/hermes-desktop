@@ -33,9 +33,11 @@ HTTP/SSE on `127.0.0.1:8642`).
 like Wibey (no modal gauntlets, no reloads, instant feedback) and renders rich
 generative UI inline via OpenUI.
 
-> **🎯 v2.0 MVP (the only thing that defines "done enough to switch to daily"):**
-> **Phase 0 + Phase 1** — the fork boots on Mac, SBC Tech-skinned, and the chat
-> **generates + renders + interacts with OpenUI inline like Wibey.** That's it.
+> **🎯 v2.0 MVP status:** COMPLETE as of 2026-06-19. The fork boots on Mac,
+> is SBC Tech-skinned, and chat **generates + renders + interacts with OpenUI
+> inline like Wibey.** Screenshot smoke verified the loop: generated UI rendered
+> in chat, a follow-up button sent a new user message, and Hermes responded with
+> another rendered UI section.
 > The other 10 features (Phases 2–6) are an explicit **post-MVP backlog** — add
 > them when you feel the itch, not before. v2 is a **personal** app (hermes-agent
 > brain, BYO-model); the Walmart v1 (`code_puppy_gui`) stays the work tool — no
@@ -177,13 +179,13 @@ cold:
 ### Current build status (2026-06-19)
 
 - **Phase 0 — Foundation:** complete and committed.
-- **Phase 1 — Signature MVP:** complete enough to move beyond MVP; OpenUI inline,
-  interactions, accessibility pass, and Artifacts canvas are committed.
+- **Phase 1 — Signature MVP:** complete. OpenUI inline generation/rendering,
+  interactions, and accessibility pass are committed and manually smoke-verified.
 - **Phase 2 — Cockpit:** mostly complete. Workshop live view, pause/interrupt
   controls, and Token Pill first pass are committed. One-off sub-agent chat is
   parked for a later steering pass.
-- **Next major phase:** Phase 3 — Branching + PIV, unless a stabilization pass is
-  chosen first.
+- **Next major phase:** Phase 3 — Branching + PIV, unless a short stabilization
+  pass is chosen first.
 
 ### Original handoff status
 

@@ -33,6 +33,14 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 
 ## Current Status
 
+- **MVP is complete as of 2026-06-19.** Phase 0 foundation is done and Phase 1
+  OpenUI inline generation/rendering/interactions are working in-app.
+- Manual screenshot smoke verified the core loop: OpenUI rendered as live UI in
+  chat, a follow-up button sent a new user message, and Hermes responded with
+  another rendered UI section.
+- Future roadmap work is post-MVP. Next major phase: Phase 3 Branching + PIV,
+  unless a short stabilization pass is chosen first.
+
 - Phase 0 is complete and committed: `f9c191d feat: establish SBC Tech phase 0 foundation`.
 - The fork is pinned, `upstream` is configured, dependencies install, and the app boots on macOS.
 - PostHog telemetry is removed from runtime/source code, dependencies, CSP, and Settings UI.
@@ -40,8 +48,8 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - The `sbc-tech` theme is registered in the theme registry and is the default dark theme for new installs.
 - Manual smoke confirmed: app returns to the expected setup/main state after restart.
 - Automated verification passed: `npm run typecheck`, `npm run test`, `npm run build`, and dev startup probe.
-- Phase 1 is complete enough to move beyond MVP: OpenUI inline rendering,
-  interactions, and accessibility pass are committed.
+- Phase 1 is complete: OpenUI inline rendering, interactions, and accessibility
+  pass are committed and smoke-verified.
 - Phase 2 has started: Workshop live view, pause/interrupt controls, and Token
   Pill first pass are committed. One-off sub-agent chat is intentionally parked
   for later.
