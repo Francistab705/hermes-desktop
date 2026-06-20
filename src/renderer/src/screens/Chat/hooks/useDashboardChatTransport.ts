@@ -10,9 +10,9 @@ import {
   type DashboardStreamEvent,
 } from "../dashboardEventAdapter";
 import { DashboardGatewayClient } from "../dashboardGatewayClient";
+import { executeSlash, type SlashExecOutcome } from "../slashExec";
 import type { ActiveTurn, Attachment, ChatMessage, UsageState } from "../types";
 import type { DesktopSessionContinuationItem } from "../../../../../shared/session-continuation";
-import type { WorkshopDelegationEvent } from "../../../../../shared/workshop";
 
 interface SessionResponse {
   info?: unknown;
@@ -89,18 +89,38 @@ interface UseDashboardChatTransportArgs {
   modelBaseUrl?: string;
   profile?: string;
   provider?: string;
-  onWorkshopEvent?: (event: WorkshopDelegationEvent) => void;
   setHermesSessionId: (id: string) => void;
   setIsLoading: (loading: boolean) => void;
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setToolProgress: (tool: string | null) => void;
   setUsage: React.Dispatch<React.SetStateAction<UsageState | null>>;
+  /** Called once per connection when the dashboard transport is found to be
+   *  unavailable on a remote/SSH connection and the renderer is falling back to
+   *  the legacy HTTP transport. Lets the UI surface a one-time notice. */
+  onDashboardUnavailable?: (reason: string) => void;
 }
 
 interface UseDashboardChatTransportResult {
   abort: () => void;
   enabled: boolean;
   sendMessage: (text: string, attachments?: Attachment[]) => Promise<boolean>;
+  /**
+   * Run a slash command through the gateway's `slash.exec` pipeline instead of
+   * submitting it to the model as a literal prompt. `sys` renders command
+   * output into the transcript; a `send` outcome hands an agent prompt back to
+   * the caller so it can run a normal streaming turn.
+   */
+  execSlash: (
+    command: string,
+    sys: (text: string) => void,
+  ) => Promise<SlashExecOutcome>;
+  /**
+   * Launch a background (`/btw`, `/bg`, `/background`) prompt via the gateway's
+   * `prompt.background` RPC. It runs a separate agent concurrently with the
+   * main turn — so it never blocks or queues — and the answer arrives later as
+   * a `background.complete` event rendered into the transcript.
+   */
+  runBackground: (text: string) => Promise<{ taskId?: string; error?: string }>;
 }
 
 interface DashboardSeedMessage {
@@ -113,99 +133,6 @@ interface DashboardSeedOptions {
 }
 
 type DashboardConnectionMode = "local" | "remote" | "ssh";
-
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-function numberValue(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : undefined;
-}
-
-function normalizeWorkshopStatus(
-  value: unknown,
-): WorkshopDelegationEvent["status"] {
-  return value === "queued" ||
-    value === "running" ||
-    value === "completed" ||
-    value === "failed" ||
-    value === "paused"
-    ? value
-    : "unknown";
-}
-
-function mapWorkshopEvent(
-  event: DashboardStreamEvent,
-): WorkshopDelegationEvent | null {
-  const payload = (event.payload as Record<string, unknown> | undefined) ?? {};
-  const subagentId = stringValue(payload.subagent_id);
-  const toolId = stringValue(payload.tool_id);
-  const id =
-    subagentId || toolId || `${event.session_id || "session"}:${event.type}`;
-  const model = stringValue(payload.model);
-  const goal = stringValue(payload.goal) || stringValue(payload.context);
-  const text =
-    stringValue(payload.text) ||
-    stringValue(payload.summary) ||
-    stringValue(payload.tool_preview);
-
-  if (event.type === "tool.start" && payload.name === "delegate_task") {
-    return {
-      id,
-      parentId: null,
-      agent: "Main agent",
-      status: "running",
-      title: "delegate_task",
-      detail: goal || "Delegation tool call started.",
-      timestamp: Date.now(),
-      source: "event",
-    };
-  }
-
-  if (event.type === "tool.complete" && payload.name === "delegate_task") {
-    return {
-      id,
-      parentId: null,
-      agent: "Main agent",
-      status: "completed",
-      title: "delegate_task complete",
-      detail: stringValue(payload.summary) || "Delegation tool call completed.",
-      timestamp: Date.now(),
-      source: "event",
-    };
-  }
-
-  if (!event.type.startsWith("subagent.")) return null;
-
-  return {
-    id,
-    parentId: stringValue(payload.parent_id) || null,
-    agent: model || "Subagent",
-    status:
-      event.type === "subagent.complete"
-        ? normalizeWorkshopStatus(payload.status) === "unknown"
-          ? "completed"
-          : normalizeWorkshopStatus(payload.status)
-        : "running",
-    title: goal || stringValue(payload.child_session_id) || id,
-    detail: [
-      text,
-      model ? `model: ${model}` : "",
-      numberValue(payload.tool_count) != null
-        ? `tools used: ${numberValue(payload.tool_count)}`
-        : "",
-      numberValue(payload.depth) != null
-        ? `depth: ${numberValue(payload.depth)}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    timestamp: Date.now(),
-    source: "event",
-  };
-}
 
 export function dashboardChatEnabledFromEnv(
   value: string | undefined,
@@ -878,7 +805,6 @@ export function useDashboardChatTransport({
   messages,
   model,
   modelBaseUrl,
-  onWorkshopEvent,
   profile,
   provider,
   setHermesSessionId,
@@ -886,10 +812,18 @@ export function useDashboardChatTransport({
   setMessages,
   setToolProgress,
   setUsage,
+  onDashboardUnavailable,
 }: UseDashboardChatTransportArgs): UseDashboardChatTransportResult {
   const clientRef = useRef<DashboardGatewayClient | null>(null);
   const connectingRef = useRef<Promise<DashboardGatewayClient> | null>(null);
   const clientGenerationRef = useRef(0);
+  // Sticky "dashboard transport can't connect on this remote/SSH connection"
+  // flag. The dashboard WebSocket (`/api/ws`) never connects against a tunneled
+  // `hermes gateway` (issue #667), so once we've learned it's unavailable we
+  // fail `ensureClient` fast on every later message instead of re-running the
+  // multi-second status+probe — letting the caller fall back to legacy HTTP
+  // immediately. Reset on connection change (see the effect below).
+  const dashboardUnavailableRef = useRef(false);
   const runtimeSessionIdRef = useRef<string | null>(null);
   const storedSessionIdRef = useRef<string | null>(hermesSessionId);
   const messagesRef = useRef<ChatMessage[]>(messages);
@@ -898,13 +832,6 @@ export function useDashboardChatTransport({
   const recreateRuntimeSessionRef = useRef(false);
   const lastRuntimeSessionWasCreatedRef = useRef(false);
   const pendingClarifyRequestIdRef = useRef<string | null>(null);
-  // Accumulates this turn's subagent/delegation events so we can persist the
-  // tree to Workshop history on turn completion. The dashboard chat transport
-  // runs here in the renderer, so these events never reach the main process's
-  // separate gateway client — we must capture them at the source.
-  const delegationEventsRef = useRef<
-    Array<{ type: string; payload: Record<string, unknown> }>
-  >([]);
   const pendingRecoveredContinuationRef = useRef<
     DesktopSessionContinuationItem[]
   >([]);
@@ -930,6 +857,7 @@ export function useDashboardChatTransport({
 
   useEffect(() => {
     clientGenerationRef.current += 1;
+    dashboardUnavailableRef.current = false;
     clientRef.current?.close();
     clientRef.current = null;
     connectingRef.current = null;
@@ -955,20 +883,28 @@ export function useDashboardChatTransport({
       }
       logDashboardEvent(event, "accepted", runtimeSessionId);
 
-      // Capture delegation traffic for Workshop history (persisted on
-      // turn-complete below).
-      if (
-        event.type.startsWith("subagent.") ||
-        ((event.type === "tool.start" || event.type === "tool.complete") &&
-          (event.payload as Record<string, unknown> | undefined)?.name ===
-            "delegate_task")
-      ) {
-        const workshopEvent = mapWorkshopEvent(event);
-        if (workshopEvent) onWorkshopEvent?.(workshopEvent);
-        delegationEventsRef.current.push({
-          type: event.type,
-          payload: (event.payload as Record<string, unknown>) ?? {},
-        });
+      // Background (`/btw`) prompts run on a separate agent and report back via
+      // `background.complete` — outside the main turn lifecycle, so render the
+      // answer as a standalone agent message without touching isLoading or the
+      // active turn.
+      if (event.type === "background.complete") {
+        const p =
+          event.payload && typeof event.payload === "object"
+            ? (event.payload as { task_id?: string; text?: string })
+            : {};
+        const label = p.task_id ? `[bg ${p.task_id}] ` : "[bg] ";
+        const body = String(p.text ?? "").trim() || "(no output)";
+        const appended: ChatMessage[] = [
+          ...messagesRef.current,
+          {
+            id: `bg-${p.task_id || Date.now()}`,
+            role: "agent",
+            content: `${label}${body}`,
+          },
+        ];
+        messagesRef.current = appended;
+        setMessages(appended);
+        return;
       }
 
       const failed =
@@ -1019,24 +955,6 @@ export function useDashboardChatTransport({
         activeTurnRef.current = null;
         setToolProgress(null);
         setIsLoading(false);
-        // Persist this turn's delegation tree to Workshop history. The
-        // dashboard transport runs in the renderer with its own gateway
-        // client, so we save via that same client using the delegation events
-        // captured above (the main process's separate client never saw them).
-        const delegationEvents = delegationEventsRef.current;
-        delegationEventsRef.current = [];
-        if (
-          delegationEvents.length > 0 &&
-          typeof window.hermesAPI.saveWorkshopHistory === "function"
-        ) {
-          void window.hermesAPI
-            .saveWorkshopHistory(
-              storedSessionIdRef.current ?? undefined,
-              profile,
-              delegationEvents,
-            )
-            .catch(() => undefined);
-        }
         const usage = usageFromPayload(event.payload);
         if (usage) {
           setUsage((prev) => ({
@@ -1070,7 +988,6 @@ export function useDashboardChatTransport({
     [
       activeTurnRef,
       connectionMode,
-      onWorkshopEvent,
       setIsLoading,
       setMessages,
       setToolProgress,
@@ -1082,6 +999,11 @@ export function useDashboardChatTransport({
     useCallback(async (): Promise<DashboardGatewayClient> => {
       const existing = clientRef.current;
       if (existing?.connected) return existing;
+      // Already known unavailable on this remote/SSH connection — fail fast so the
+      // caller falls back to legacy without re-running the slow status+probe.
+      if (dashboardUnavailableRef.current) {
+        throw new Error("Hermes dashboard transport is unavailable");
+      }
       if (connectingRef.current) return connectingRef.current;
 
       const generation = clientGenerationRef.current;
@@ -1091,12 +1013,26 @@ export function useDashboardChatTransport({
           throw new Error("Hermes dashboard connection was superseded");
         }
         if (!status.running || !status.connection?.wsUrl) {
+          // Sticky-fallback + notify only when we're actually going to fall back
+          // to legacy (auto mode). With an explicit "dashboard" preference
+          // (fallbackOnUnavailable=false) the turn errors instead, so latching or
+          // claiming "using basic chat" would be wrong. Local stays retryable —
+          // its dashboard may still be spawning.
+          if (
+            connectionMode !== "local" &&
+            fallbackOnUnavailable &&
+            !dashboardUnavailableRef.current
+          ) {
+            dashboardUnavailableRef.current = true;
+            onDashboardUnavailable?.(
+              status.error || "Hermes dashboard transport is unavailable",
+            );
+          }
           throw new Error(
             status.error || "Hermes dashboard transport is unavailable",
           );
         }
-        let client: DashboardGatewayClient;
-        client = new DashboardGatewayClient({
+        const client: DashboardGatewayClient = new DashboardGatewayClient({
           onEvent: handleGatewayEvent,
           onClose: () => {
             if (clientRef.current === client) {
@@ -1121,7 +1057,13 @@ export function useDashboardChatTransport({
           connectingRef.current = null;
         }
       }
-    }, [handleGatewayEvent, profile]);
+    }, [
+      handleGatewayEvent,
+      profile,
+      connectionMode,
+      fallbackOnUnavailable,
+      onDashboardUnavailable,
+    ]);
 
   const ensureRuntimeSession = useCallback(
     async (
@@ -1499,6 +1441,55 @@ export function useDashboardChatTransport({
     ],
   );
 
+  const execSlash = useCallback(
+    async (
+      command: string,
+      sys: (text: string) => void,
+    ): Promise<SlashExecOutcome> => {
+      if (!enabled) {
+        return { kind: "error", message: "dashboard transport disabled" };
+      }
+      try {
+        const client = await ensureClient();
+        const runtimeSessionId = await ensureRuntimeSession(client);
+        const sessionId = await ensureSelectedModel(client, runtimeSessionId);
+        return await executeSlash({
+          command,
+          sessionId,
+          request: (method, params) => client.request(method, params),
+          sys,
+        });
+      } catch (err) {
+        return {
+          kind: "error",
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+    [enabled, ensureClient, ensureRuntimeSession, ensureSelectedModel],
+  );
+
+  const runBackground = useCallback(
+    async (text: string): Promise<{ taskId?: string; error?: string }> => {
+      if (!enabled) return { error: "dashboard transport disabled" };
+      try {
+        const client = await ensureClient();
+        const runtimeSessionId = await ensureRuntimeSession(client);
+        const sessionId = await ensureSelectedModel(client, runtimeSessionId);
+        const r = await client.request<{ task_id?: string }>(
+          "prompt.background",
+          { session_id: sessionId, text },
+        );
+        return { taskId: r?.task_id };
+      } catch (err) {
+        return {
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+    [enabled, ensureClient, ensureRuntimeSession, ensureSelectedModel],
+  );
+
   const abort = useCallback(() => {
     const client = clientRef.current;
     const sessionId = runtimeSessionIdRef.current;
@@ -1518,5 +1509,5 @@ export function useDashboardChatTransport({
     [],
   );
 
-  return { abort, enabled, sendMessage };
+  return { abort, enabled, sendMessage, execSlash, runBackground };
 }

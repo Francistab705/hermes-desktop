@@ -49,6 +49,7 @@ import { readModels } from "./models";
 import { providerListSafe } from "./secrets";
 import { HIDDEN_SUBPROCESS_OPTIONS } from "./process-options";
 import { type Attachment, escapeXmlAttr } from "../shared/attachments";
+import { type SessionModelOverride } from "../shared/model-override";
 import { URL_KEY_MAP, OPENAI_COMPAT_PROVIDERS } from "../shared/url-key-map";
 import {
   chatToolEventFromPayload,
@@ -442,16 +443,6 @@ async function waitForDashboardReady(
   throw new Error("Hermes dashboard gateway did not become ready");
 }
 
-/** True for the gateway events the Workshop's delegation tree cares about:
- *  any `subagent.*` event, or a `delegate_task` tool start/complete. */
-function isDelegationEvent(event: GatewayEvent): boolean {
-  return (
-    event.type.startsWith("subagent.") ||
-    ((event.type === "tool.start" || event.type === "tool.complete") &&
-      event.payload?.name === "delegate_task")
-  );
-}
-
 class TuiGatewayClient {
   private handlers = new Set<GatewayEventHandler>();
   private nextId = 0;
@@ -459,12 +450,6 @@ class TuiGatewayClient {
   private port = 0;
   private proc: ChildProcess | null = null;
   private recentEvents: GatewayEvent[] = [];
-  // Dedicated buffer for delegation/subagent events. Kept separate from
-  // `recentEvents` because a delegating turn fires dozens of regular tool
-  // events (web_search, read_file, …) per subagent, which would otherwise
-  // evict the lower-frequency `subagent.*` / `delegate_task` events from the
-  // shared 50-slot ring before the Workshop's 5s poll can observe them.
-  private recentDelegationEvents: GatewayEvent[] = [];
   private ready: Promise<void> | null = null;
   private readyReject: ((error: Error) => void) | null = null;
   private readyResolve: (() => void) | null = null;
@@ -489,14 +474,6 @@ class TuiGatewayClient {
       if (predicate(event)) return event;
     }
     return null;
-  }
-
-  recentEventSnapshot(): GatewayEvent[] {
-    return [...this.recentEvents];
-  }
-
-  recentDelegationEventSnapshot(): GatewayEvent[] {
-    return [...this.recentDelegationEvents];
   }
 
   async request<T>(
@@ -692,17 +669,6 @@ class TuiGatewayClient {
     if (this.recentEvents.length > 50) {
       this.recentEvents.splice(0, this.recentEvents.length - 50);
     }
-    // Also capture delegation/subagent events in a dedicated buffer that the
-    // high-volume regular tool events can't evict (see field comment).
-    if (isDelegationEvent(frame.params)) {
-      this.recentDelegationEvents.push(frame.params);
-      if (this.recentDelegationEvents.length > 200) {
-        this.recentDelegationEvents.splice(
-          0,
-          this.recentDelegationEvents.length - 200,
-        );
-      }
-    }
     if (frame.params.type === "gateway.ready") {
       this.readyResolve?.();
     }
@@ -851,103 +817,6 @@ function stopTuiGatewayClient(profile?: string): void {
   if (!client) return;
   client.stop();
   tuiGatewayClients.delete(key);
-}
-
-export interface TuiDelegationStatus {
-  active?: unknown[];
-  paused?: boolean;
-  max_spawn_depth?: number;
-  max_concurrent_children?: number;
-}
-
-export async function getTuiDelegationStatus(
-  profile?: string,
-): Promise<TuiDelegationStatus> {
-  if (isRemoteMode()) {
-    throw new Error(
-      "Workshop delegation status is only available for local profiles.",
-    );
-  }
-  if (!shouldUseTuiGatewayClient()) {
-    return { active: [], paused: false };
-  }
-  return getTuiGatewayClient(profile).request<TuiDelegationStatus>(
-    "delegation.status",
-    {},
-    10_000,
-  );
-}
-
-export function getTuiRecentDelegationEvents(profile?: string): GatewayEvent[] {
-  const client = tuiGatewayClients.get(profileKey(profile));
-  if (!client) return [];
-  // Read from the dedicated delegation buffer, which the high-volume regular
-  // tool events can't evict (unlike the shared recentEvents ring).
-  return client.recentDelegationEventSnapshot();
-}
-
-// ── Spawn-tree (delegation) history ──────────────────────────────────
-// Hermes persists delegation trees to $HERMES_HOME/spawn-trees via the
-// dashboard gateway's spawn_tree.{save,list,load} RPCs. These wrappers let
-// the desktop save a finished run and browse/reopen past ones.
-
-export interface SpawnTreeListEntry {
-  path?: string;
-  session_id?: string;
-  finished_at?: number;
-  started_at?: number;
-  label?: string;
-  count?: number;
-}
-
-export async function saveTuiSpawnTree(
-  profile: string | undefined,
-  payload: {
-    session_id?: string;
-    subagents: unknown[];
-    started_at?: number;
-    finished_at?: number;
-    label?: string;
-  },
-): Promise<{ path?: string; session_id?: string }> {
-  if (isRemoteMode() || !shouldUseTuiGatewayClient()) return {};
-  return getTuiGatewayClient(profile).request<{
-    path?: string;
-    session_id?: string;
-  }>("spawn_tree.save", payload, 10_000);
-}
-
-export async function listTuiSpawnTrees(
-  profile?: string,
-): Promise<SpawnTreeListEntry[]> {
-  if (isRemoteMode()) {
-    throw new Error("Workshop history is only available for local profiles.");
-  }
-  if (!shouldUseTuiGatewayClient()) return [];
-  const result = await getTuiGatewayClient(profile).request<{
-    entries?: SpawnTreeListEntry[];
-  }>("spawn_tree.list", { cross_session: true, limit: 50 }, 10_000);
-  return Array.isArray(result.entries) ? result.entries : [];
-}
-
-export async function loadTuiSpawnTree(
-  profile: string | undefined,
-  path: string,
-): Promise<{
-  session_id?: string;
-  started_at?: number;
-  finished_at?: number;
-  label?: string;
-  subagents?: unknown[];
-}> {
-  if (isRemoteMode()) {
-    throw new Error("Workshop history is only available for local profiles.");
-  }
-  return getTuiGatewayClient(profile).request(
-    "spawn_tree.load",
-    { path },
-    10_000,
-  );
 }
 
 const CAPABILITIES_TIMEOUT_MS = 350;
@@ -1217,51 +1086,6 @@ export function contextFolderSystemMessage(
   };
 }
 
-export const OPENUI_SYSTEM_INSTRUCTIONS = `Hermes Desktop can render rich assistant UI when your entire final answer is exactly one fenced OpenUI Lang block.
-
-Use OpenUI when the user asks for GenUI, OpenUI, a visual UI, a dashboard, a work summary UI, cards, rich layout, or when a structured visual answer is helpful. Otherwise answer normally in markdown.
-
-Never output raw HTML, inline CSS, JSX, XML, SVG, or angle-bracket UI markup for visual answers. If you cannot produce valid OpenUI Lang, fall back to plain markdown rather than HTML/CSS.
-
-OpenUI contract:
-- The whole assistant message must be a single markdown fence with language openui.
-- Do not put prose before or after the fence.
-- Inside the fence, use OpenUI Lang assignment syntax only, never JSX, XML, HTML, CSS, SVG, or angle-bracket tags.
-- The first statement inside the fence must assign root.
-- Compose children by assigning variables and passing arrays.
-
-Available OpenUI components:
-- Stack(children)
-- Callout(title, body)
-- StatTile(label, value, change?)
-- KPIRow(tiles)
-- DataTable(columns, rows)
-- PlanCard(title, steps)
-- FollowUps(prompts) - clicking sends the prompt as a new chat message
-- Form(title, fields) - submitting sends field values as a new chat message
-- AgentStatus(phase, status, detail?)
-- RiskList(title, risks)
-- ToolSummary(title, tools) where tools is [{ name, outcome }]
-- FileChangeCard(title, files, summary?)
-
-Valid example:
-\`\`\`openui
-root = Stack([status, risks, followups])
-status = AgentStatus("Review", "Ready", "OpenUI is wired into chat.")
-risks = RiskList("Known limits", ["Follow-up buttons are visual only", "Forms are disabled"])
-followups = FollowUps(["Show risks", "Draft next slice"])
-\`\`\``;
-
-function openUISystemMessage(): { role: "system"; content: string } {
-  return { role: "system", content: OPENUI_SYSTEM_INSTRUCTIONS };
-}
-
-function combineInstructions(
-  ...values: Array<string | null | undefined>
-): string {
-  return values.filter(Boolean).join("\n\n");
-}
-
 function reasoningEffortForProfile(
   profile?: string,
 ): "minimal" | "low" | "medium" | "high" | "xhigh" | null {
@@ -1286,8 +1110,9 @@ function sendMessageViaApi(
   history?: Array<{ role: string; content: string }>,
   attachments?: Attachment[],
   contextFolder?: string,
+  override?: SessionModelOverride,
 ): ChatHandle {
-  const mc = getModelConfig(profile);
+  const mc = effectiveModelConfig(profile, override);
   const controller = new AbortController();
 
   // Build full conversation from history + current message (standard OpenAI format).
@@ -1312,7 +1137,6 @@ function sendMessageViaApi(
   // roles, so reloaded sessions stay clean too.
   const ctxSystem = contextFolderSystemMessage(contextFolder);
   if (ctxSystem) messages.unshift(ctxSystem);
-  messages.unshift(openUISystemMessage());
 
   const reasoningEffort = reasoningEffortForProfile(profile);
   const bodyObj: Record<string, unknown> = {
@@ -1691,8 +1515,9 @@ function sendMessageViaRuns(
   history?: Array<{ role: string; content: string }>,
   attachments?: Attachment[],
   contextFolder?: string,
+  override?: SessionModelOverride,
 ): ChatHandle {
-  const mc = getModelConfig(profile);
+  const mc = effectiveModelConfig(profile, override);
   const controller = new AbortController();
   const apiUrl = getApiUrl(profile);
   const headersForAuth = getApiAuthHeaders(profile);
@@ -1708,10 +1533,7 @@ function sendMessageViaRuns(
   const reasoningEffort = reasoningEffortForProfile(profile);
   if (reasoningEffort) bodyObj.reasoning_effort = reasoningEffort;
   if (sessionId) bodyObj.session_id = sessionId;
-  bodyObj.instructions = combineInstructions(
-    OPENUI_SYSTEM_INSTRUCTIONS,
-    ctxSystem?.content,
-  );
+  if (ctxSystem) bodyObj.instructions = ctxSystem.content;
   const bodyBuf = Buffer.from(JSON.stringify(bodyObj), "utf-8");
   const headers = getJsonApiHeaders(profile, bodyBuf);
   if (sessionId) {
@@ -1748,6 +1570,7 @@ function sendMessageViaRuns(
       history,
       attachments,
       contextFolder,
+      override,
     );
   }
 
@@ -2252,12 +2075,65 @@ const CLI_COMPAT_PROVIDER_OVERRIDE: Record<string, string> = {
   aimlapi: "custom",
 };
 
+type ModelConfig = ReturnType<typeof getModelConfig>;
+
+/**
+ * Overlay a session-scoped model override on top of the persisted config.yaml
+ * model config. Non-empty override fields win; empty/absent fields fall back to
+ * the persisted value. The result drives request routing for a single turn
+ * without ever touching config.yaml (the global default is preserved — #688).
+ */
+function effectiveModelConfig(
+  profile: string | undefined,
+  override?: SessionModelOverride,
+): ModelConfig {
+  const mc = getModelConfig(profile);
+  if (!override) return mc;
+  return {
+    provider: override.provider || mc.provider,
+    model: override.model || mc.model,
+    // baseUrl is intentionally taken verbatim from the override (including an
+    // empty string) so a switch to a built-in provider clears a stale custom
+    // URL; only fall back to the persisted value when the override omits it.
+    baseUrl: override.baseUrl !== undefined ? override.baseUrl : mc.baseUrl,
+  };
+}
+
+function hasAttachments(attachments?: Attachment[]): boolean {
+  return (attachments?.length ?? 0) > 0;
+}
+
+/**
+ * Legacy CLI is only a safe session-override escape hatch for text-only turns.
+ * Upstream desktop applies `/model <model> --provider <provider>` on the active
+ * gateway session, then attaches media and submits through that same session.
+ * If we force an attachment turn through the CLI, images/path refs are silently
+ * dropped by `sendMessageViaCli`, so leave attachment turns on the gateway/API
+ * path whenever it is available.
+ */
+export function shouldForceCliForSessionOverride(
+  persisted: ModelConfig,
+  effective: ModelConfig,
+  override: SessionModelOverride | undefined,
+  attachments?: Attachment[],
+): boolean {
+  if (hasAttachments(attachments)) return false;
+  const overrideChangesRouting =
+    !!override &&
+    (effective.provider !== persisted.provider ||
+      effective.baseUrl !== persisted.baseUrl);
+  return (
+    !!CLI_COMPAT_PROVIDER_OVERRIDE[effective.provider] || overrideChangesRouting
+  );
+}
+
 function sendMessageViaCli(
   message: string,
   cb: ChatCallbacks,
   profile?: string,
   resumeSessionId?: string,
   attachments?: Attachment[],
+  override?: SessionModelOverride,
 ): ChatHandle {
   // CLI fallback can't pipe multimodal content; inline text-file attachments
   // and ignore images.  The gateway is the supported attachment path; this
@@ -2276,7 +2152,15 @@ function sendMessageViaCli(
       message = message.trim() ? `${message}\n\n${wrapped}` : wrapped;
     }
   }
-  const mc = getModelConfig(profile);
+  // Effective config = persisted config.yaml overlaid with the session
+  // override. Everything downstream (provider routing, base_url env, key
+  // resolution, apiMode lookup) reads from `mc`, so the override drives the
+  // whole CLI invocation without touching config.yaml.
+  const mc = effectiveModelConfig(profile, override);
+  const baseMc = getModelConfig(profile);
+  const overrideChangesRouting =
+    !!override &&
+    (mc.provider !== baseMc.provider || mc.baseUrl !== baseMc.baseUrl);
   const profileEnv = readEnv(profile);
 
   const args = hermesCliArgs();
@@ -2296,6 +2180,11 @@ function sendMessageViaCli(
   const cliProvider = CLI_COMPAT_PROVIDER_OVERRIDE[mc.provider];
   if (cliProvider) {
     args.push("--provider", cliProvider);
+  } else if (overrideChangesRouting && mc.provider && mc.provider !== "auto") {
+    // A session override that switches to a named provider (e.g. gemini) must
+    // select it explicitly — otherwise the CLI would infer the provider from
+    // the now-stale config/env and route to the wrong host.
+    args.push("--provider", mc.provider);
   }
 
   const env: Record<string, string> = {
@@ -2585,6 +2474,7 @@ async function sendMessageViaNonGatewayApi(
   history?: Array<{ role: string; content: string }>,
   attachments?: Attachment[],
   contextFolder?: string,
+  override?: SessionModelOverride,
 ): Promise<ChatHandle> {
   const approvalCommand = /^\/(?:approve|deny)\b/i.test(message.trim());
   if (!attachments?.length && !approvalCommand) {
@@ -2598,6 +2488,7 @@ async function sendMessageViaNonGatewayApi(
         history,
         attachments,
         contextFolder,
+        override,
       );
     }
   }
@@ -2610,6 +2501,7 @@ async function sendMessageViaNonGatewayApi(
     history,
     attachments,
     contextFolder,
+    override,
   );
 }
 
@@ -2621,13 +2513,18 @@ async function sendMessageViaBestApi(
   history?: Array<{ role: string; content: string }>,
   attachments?: Attachment[],
   contextFolder?: string,
+  override?: SessionModelOverride,
 ): Promise<ChatHandle> {
   const approvalCommand = /^\/(?:approve|deny)\b/i.test(message.trim());
+  // Skip the TUI gateway when a session-scoped model override is active — the
+  // TUI gateway reads its model from config.yaml and has no per-request
+  // override mechanism. The API path below already honours the override.
   if (
     shouldUseTuiGatewayClient() &&
     !isRemoteMode() &&
     !attachments?.length &&
-    !approvalCommand
+    !approvalCommand &&
+    !override
   ) {
     try {
       return await sendMessageViaTuiGateway(
@@ -2654,6 +2551,7 @@ async function sendMessageViaBestApi(
     history,
     attachments,
     contextFolder,
+    override,
   );
 }
 
@@ -2665,6 +2563,7 @@ async function sendMessageViaBestApiWithLocalRecovery(
   history?: Array<{ role: string; content: string }>,
   attachments?: Attachment[],
   contextFolder?: string,
+  override?: SessionModelOverride,
 ): Promise<ChatHandle> {
   let aborted = false;
   let retrying = false;
@@ -2709,6 +2608,7 @@ async function sendMessageViaBestApiWithLocalRecovery(
         history,
         attachments,
         contextFolder,
+        override,
       );
       return;
     }
@@ -2719,6 +2619,7 @@ async function sendMessageViaBestApiWithLocalRecovery(
       profile,
       resumeSessionId,
       attachments,
+      override,
     );
   };
 
@@ -2796,6 +2697,7 @@ async function sendMessageViaBestApiWithLocalRecovery(
     history,
     attachments,
     contextFolder,
+    override,
   );
 
   return handle;
@@ -2809,10 +2711,12 @@ export async function sendMessage(
   history?: Array<{ role: string; content: string }>,
   attachments?: Attachment[],
   contextFolder?: string,
+  override?: SessionModelOverride,
 ): Promise<ChatHandle> {
   ensureInitialized();
 
-  // Remote mode: always use API, no CLI fallback
+  // Remote mode: always use API, no CLI fallback. Cross-provider session
+  // overrides are limited to the model string here (no CLI transport remotely).
   if (isRemoteMode()) {
     return sendMessageViaBestApi(
       message,
@@ -2822,17 +2726,24 @@ export async function sendMessage(
       history,
       attachments,
       contextFolder,
+      override,
     );
   }
 
   const mc = getModelConfig(profile);
-  if (CLI_COMPAT_PROVIDER_OVERRIDE[mc.provider]) {
+  const eff = effectiveModelConfig(profile, override);
+  // Official upstream desktop hot-swaps the active gateway session with
+  // `/model ... --provider ...` before attaching media and submitting. Our
+  // renderer dashboard transport follows that path. The legacy CLI fallback is
+  // kept only for text-only turns; it cannot preserve image/path attachments.
+  if (shouldForceCliForSessionOverride(mc, eff, override, attachments)) {
     return sendMessageViaCli(
       message,
       cb,
       profile,
       resumeSessionId,
       attachments,
+      override,
     );
   }
 
@@ -2856,11 +2767,19 @@ export async function sendMessage(
       history,
       attachments,
       contextFolder,
+      override,
     );
   }
 
   // Fallback to CLI
-  return sendMessageViaCli(message, cb, profile, resumeSessionId, attachments);
+  return sendMessageViaCli(
+    message,
+    cb,
+    profile,
+    resumeSessionId,
+    attachments,
+    override,
+  );
 }
 
 // Lazy init — called on first sendMessage or gateway start

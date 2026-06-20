@@ -1,21 +1,8 @@
-import {
-  Component,
-  memo,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { Pin } from "lucide-react";
-import icon from "../../assets/icon.png";
+import { memo, useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { Copy, Check } from "lucide-react";
+import loadingGif from "../../assets/loadingo.gif";
 import { AgentMarkdown } from "../../components/AgentMarkdown";
 import { AttachmentChip } from "../../components/AttachmentChip";
-import {
-  getStreamingOpenUIResponse,
-  OpenUIRenderer,
-  type StreamingOpenUIResult,
-} from "../../components/genui";
 import { MediaSegmentView } from "../../components/MediaImage";
 import { useI18n } from "../../components/useI18n";
 import { parseMediaTokens, cleanLeakedToolTags } from "./mediaUtils";
@@ -23,84 +10,6 @@ import type { ChatBubbleMessage, ChatMessage } from "./types";
 
 export const APPROVAL_RE =
   /⚠️.*dangerous|requires? (your )?approval|\/approve.*\/deny|do you want (me )?to (proceed|continue|run|execute)/i;
-
-interface GenUIBoundaryProps {
-  fallback: ReactNode;
-  children: ReactNode;
-}
-
-interface GenUIBoundaryState {
-  hasError: boolean;
-}
-
-class GenUIBoundary extends Component<GenUIBoundaryProps, GenUIBoundaryState> {
-  state: GenUIBoundaryState = { hasError: false };
-
-  static getDerivedStateFromError(): GenUIBoundaryState {
-    return { hasError: true };
-  }
-
-  override componentDidCatch(error: unknown): void {
-    console.error("Failed to render OpenUI response", error);
-  }
-
-  override render(): ReactNode {
-    return this.state.hasError ? this.props.fallback : this.props.children;
-  }
-}
-
-function GenUIMessage({
-  response,
-  isStreaming,
-  fallback,
-  onSendMessage,
-}: {
-  response: string;
-  isStreaming: boolean;
-  fallback: ReactNode;
-  onSendMessage?: (text: string) => void;
-}): React.JSX.Element {
-  const [hasError, setHasError] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setHasError(false);
-  }, [response]);
-
-  // Only trigger error fallback when streaming is done — partial trees
-  // are expected to be incomplete / empty during streaming.
-  useEffect(() => {
-    if (isStreaming || hasError) return;
-    if (!contentRef.current) return;
-    if (contentRef.current.childElementCount === 0) setHasError(true);
-  }, [hasError, isStreaming, response]);
-
-  if (hasError) return <>{fallback}</>;
-
-  return (
-    <GenUIBoundary fallback={fallback}>
-      <div ref={contentRef}>
-        <OpenUIRenderer
-          response={response}
-          isStreaming={isStreaming}
-          onAction={(event) => {
-            if (onSendMessage && event.humanFriendlyMessage) {
-              onSendMessage(event.humanFriendlyMessage);
-            }
-          }}
-          onError={(errors) => {
-            // Suppress errors during streaming — partial trees produce
-            // transient parse failures that resolve as more tokens arrive.
-            if (!isStreaming && errors.length > 0) setHasError(true);
-          }}
-          onParseResult={(result) => {
-            if (!isStreaming && !result?.root) setHasError(true);
-          }}
-        />
-      </div>
-    </GenUIBoundary>
-  );
-}
 
 function isChatBubbleMessage(msg: ChatMessage): msg is ChatBubbleMessage {
   return (
@@ -110,14 +19,116 @@ function isChatBubbleMessage(msg: ChatMessage): msg is ChatBubbleMessage {
   );
 }
 
+/**
+ * One full loop of `loadingo.gif`, in ms (119 frames × 40ms). Used to let the
+ * animation finish its current loop after generation stops instead of freezing
+ * mid-frame.
+ */
+const GIF_LOOP_MS = 4760;
+
+/**
+ * Captures the gif's first frame as a static PNG data URL, once, shared across
+ * every avatar instance. Idle avatars (past turns) render this frozen frame so
+ * the chat isn't full of perpetually-spinning gifs — only the in-flight turn's
+ * avatar runs the live animation.
+ */
+let frozenFramePromise: Promise<string> | null = null;
+function getFrozenFrame(): Promise<string> {
+  if (!frozenFramePromise) {
+    frozenFramePromise = new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("no 2d context"));
+          // drawImage right after load captures frame 0 (not yet advanced).
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        } catch (err) {
+          reject(err as Error);
+        }
+      };
+      img.onerror = () => reject(new Error("failed to load loadingo.gif"));
+      img.src = loadingGif;
+    });
+  }
+  return frozenFramePromise;
+}
+
+/**
+ * Agent avatar. While `active` (the turn is generating) it plays the looping
+ * `loadingo.gif`. When `active` goes false it doesn't freeze instantly — it
+ * keeps animating until the end of the current loop, then swaps to a static
+ * frozen frame so the stop lands on a clean loop boundary.
+ */
 export const HermesAvatar = memo(function HermesAvatar({
   size = 30,
+  active = false,
 }: {
   size?: number;
+  /** True only for the avatar of the turn currently being generated. */
+  active?: boolean;
 }): React.JSX.Element {
+  const [frozenSrc, setFrozenSrc] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(active);
+  // Re-keying the <img> on each play session restarts the gif from frame 0 so
+  // the loop clock below is accurate.
+  const [playKey, setPlayKey] = useState(0);
+  // Timestamp (performance.now) of the current play session's frame 0; set in
+  // the effect, never during render. 0 = not yet started.
+  const playStartRef = useRef(0);
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    getFrozenFrame()
+      .then((src) => {
+        if (!cancelled) setFrozenSrc(src);
+      })
+      .catch(() => {
+        /* fall back to the live gif if the snapshot can't be built */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (active) {
+      // (Re)start the animation immediately when generation begins.
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+      if (!playing) {
+        setPlayKey((k) => k + 1);
+        playStartRef.current = performance.now();
+        setPlaying(true);
+      } else if (playStartRef.current === 0) {
+        // Mounted already playing (active on first render): anchor the loop clock.
+        playStartRef.current = performance.now();
+      }
+    } else if (playing) {
+      // Generation stopped: run out the rest of the current loop, then freeze.
+      const elapsed = (performance.now() - playStartRef.current) % GIF_LOOP_MS;
+      const remaining = GIF_LOOP_MS - elapsed;
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+      stopTimer.current = setTimeout(() => setPlaying(false), remaining);
+    }
+    return () => {
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+    };
+  }, [active, playing]);
+
   return (
     <div className="chat-avatar chat-avatar-agent">
-      <img src={icon} width={size} height={size} alt="" />
+      {playing ? (
+        <img key={playKey} src={loadingGif} width={size} height={size} alt="" />
+      ) : (
+        <img src={frozenSrc ?? loadingGif} width={size} height={size} alt="" />
+      )}
     </div>
   );
 });
@@ -138,10 +149,6 @@ interface MessageRowProps {
   isLoading: boolean;
   onApprove: () => void;
   onDeny: () => void;
-  /** Send a message into the chat pipeline (used by GenUI FollowUps/Form). */
-  onSendMessage?: (text: string) => void;
-  /** Pin an OpenUI response to the Artifacts canvas. */
-  onPinArtifact?: (response: string) => void;
   /** False on continuation rows of a turn — render a spacer instead of the
    *  avatar so the turn reads as one grouped block. Defaults to true. */
   showAvatar?: boolean;
@@ -153,11 +160,10 @@ export const MessageRow = memo(function MessageRow({
   isLoading,
   onApprove,
   onDeny,
-  onSendMessage,
-  onPinArtifact,
   showAvatar = true,
 }: MessageRowProps): React.JSX.Element {
   const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
 
   // MessageRow is wrapped in memo() but still re-renders on any prop change
   // (e.g. isLoading toggling at the end of a stream), and `parseMediaTokens`
@@ -169,29 +175,36 @@ export const MessageRow = memo(function MessageRow({
   const bubbleContent = isChatBubbleMessage(msg)
     ? (msg as ChatBubbleMessage).content
     : null;
-  const isPending = isChatBubbleMessage(msg) && !!(msg as ChatBubbleMessage).pending;
-  const openUIResult: StreamingOpenUIResult | null = useMemo(
-    () =>
-      msg.role === "agent" && bubbleContent
-        ? getStreamingOpenUIResponse(bubbleContent, isPending)
-        : null,
-    [msg.role, bubbleContent, isPending],
-  );
   const segments = useMemo(
     () =>
-      msg.role === "agent" && bubbleContent && !openUIResult
+      msg.role === "agent" && bubbleContent
         ? // Recover any tool/skill call the model leaked as text (e.g. a raw
           // `<skill_view>{"answer": …}</skill_view>` tag) before tokenizing.
           parseMediaTokens(cleanLeakedToolTags(bubbleContent))
         : null,
-    [msg.role, bubbleContent, openUIResult],
+    [msg.role, bubbleContent],
   );
+
+  const handleCopy = useCallback(async () => {
+    if (!bubbleContent) return;
+    try {
+      await window.hermesAPI.copyToClipboard(bubbleContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback: clipboard write may fail in some environments
+    }
+  }, [bubbleContent]);
 
   // Only chat bubble messages have content/attachments
   if (!isChatBubbleMessage(msg)) {
     return (
       <div className={`chat-message chat-message-${msg.role}`}>
-        {showAvatar ? <HermesAvatar /> : <AvatarSpacer />}
+        {showAvatar ? (
+          <HermesAvatar active={isLoading && isLast} />
+        ) : (
+          <AvatarSpacer />
+        )}
         <div className={`chat-bubble chat-bubble-${msg.role}`}>
           {/* Reasoning/tool messages handled separately */}
         </div>
@@ -213,18 +226,31 @@ export const MessageRow = memo(function MessageRow({
         showAvatar ? "" : " chat-message--grouped"
       }`}
     >
-      {!showAvatar ? (
+      {/* User messages stand alone (right-aligned bubble, no avatar). Only the
+          agent turn carries an avatar; its continuation rows get a spacer. */}
+      {msg.role === "user" ? null : !showAvatar ? (
         <AvatarSpacer />
-      ) : msg.role === "user" ? (
-        <div className="chat-avatar chat-avatar-user">U</div>
       ) : (
-        <HermesAvatar />
+        <HermesAvatar active={isLoading && isLast} />
       )}
       <div
         className={`chat-bubble chat-bubble-${msg.role}${
           msg.error ? " chat-bubble-error" : ""
         }`}
       >
+        {msg.content && !isLoading && (
+          <div className="chat-bubble-actions">
+            <button
+              type="button"
+              className="chat-bubble-copy"
+              onClick={handleCopy}
+              title={copied ? t("common.copied") : t("chat.copyMessage")}
+              aria-label={copied ? t("common.copied") : t("chat.copyMessage")}
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+          </div>
+        )}
         {hasAttachments && (
           <div className="chat-message-attachments">
             {msg.attachments!.map((att) => (
@@ -233,51 +259,29 @@ export const MessageRow = memo(function MessageRow({
           </div>
         )}
         {msg.content &&
-          (openUIResult ? (
-            <div className="genui-message-wrapper">
-              {onPinArtifact && !openUIResult.isStreaming && (
-                <button
-                  type="button"
-                  className="genui-pin-btn"
-                  onClick={() => onPinArtifact(openUIResult.response)}
-                  aria-label="Pin to artifact canvas"
-                >
-                  <Pin size={12} />
-                  Pin
-                </button>
-              )}
-              <GenUIMessage
-                response={openUIResult.response}
-                isStreaming={openUIResult.isStreaming}
-                fallback={<AgentMarkdown>{msg.content}</AgentMarkdown>}
-                onSendMessage={onSendMessage}
-              />
-            </div>
-          ) : msg.role === "agent" && segments ? (
-            segments.map((segment) =>
-              segment.type === "text" ? (
-                segment.value.trim() ? (
-                  // Keyed on the segment's character offset rather than its
-                  // array index — a MEDIA: token appearing mid-stream shifts
-                  // every subsequent index, which would otherwise re-mount
-                  // each downstream MediaSegmentView and re-fire its
-                  // `mediaFileExists` probe.
-                  <AgentMarkdown key={`t-${segment.start}`}>
-                    {segment.value}
-                  </AgentMarkdown>
-                ) : null
-              ) : (
-                <MediaSegmentView
-                  key={`m-${segment.start}`}
-                  token={segment.token}
-                  raw={segment.raw}
-                  source={segment.source}
-                />
-              ),
-            )
-          ) : (
-            msg.content
-          ))}
+          (msg.role === "agent" && segments
+            ? segments.map((segment) =>
+                segment.type === "text" ? (
+                  segment.value.trim() ? (
+                    // Keyed on the segment's character offset rather than its
+                    // array index — a MEDIA: token appearing mid-stream shifts
+                    // every subsequent index, which would otherwise re-mount
+                    // each downstream MediaSegmentView and re-fire its
+                    // `mediaFileExists` probe.
+                    <AgentMarkdown key={`t-${segment.start}`}>
+                      {segment.value}
+                    </AgentMarkdown>
+                  ) : null
+                ) : (
+                  <MediaSegmentView
+                    key={`m-${segment.start}`}
+                    token={segment.token}
+                    raw={segment.raw}
+                    source={segment.source}
+                  />
+                ),
+              )
+            : msg.content)}
         {msg.error && (
           <div className="chat-error-message" role="alert">
             {msg.error}
