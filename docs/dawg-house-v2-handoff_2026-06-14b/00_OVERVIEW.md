@@ -38,7 +38,7 @@ generative UI inline via OpenUI.
 > inline like Wibey.** Screenshot smoke verified the loop: generated UI rendered
 > in chat, a follow-up button sent a new user message, and Hermes responded with
 > another rendered UI section.
-> The other 10 features (Phases 2–6) are an explicit **post-MVP backlog** — add
+> The other 10 features (Phases 2–11) are an explicit **post-MVP backlog** — add
 > them when you feel the itch, not before. v2 is a **personal** app (hermes-agent
 > brain, BYO-model); the Walmart v1 (`code_puppy_gui`) stays the work tool — no
 > Walmart/BQ/Store-Trapped/Element-Gateway carryover here.
@@ -92,14 +92,14 @@ generative UI inline via OpenUI.
 | ② | Workshop pane | **BUILD** | live view + pause/interrupt shipped; one-off sub-agent chat parked | 2 | `02` |
 | ③ | Session branching + lineage tree + Wibey tabs | **BUILD** | new screen; one session model, two entry points | 3 | `03` |
 | ④ | Token / quota header pill | **ADOPT** | first header-pill pass shipped; click breakdown + threshold state | 2 | `04` |
-| ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 3 | `05` |
-| ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 4 | `06` |
-| ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 4 | `07` |
-| ⑧ | Prompt library / presets | **BUILD** | seeded from `memory/setting/prompts/`; Favorites parked (`08` §8) | 4 | `08` |
-| ⑨ | Saved Artifacts library | **BUILD** | persistent gallery/tab for generated OpenUI artifacts; shares ① renderer | 5 | `09` |
-| ⑩ | Graphiti knowledge graph + Timeline | **BUILD** | the one heavy dep (Neo4j); criteria-first | 6 (last) | `10` |
-| ⑪ | Personal Memory bridge | **ADOPT** | adopt hermes-desktop Memory UI + providers + SOUL.md; port only `/profile /daily /notes /memory` ergonomics | 4 | `11` |
-| ⑫ | Workflows (build + execute) | **EXTEND** | extends existing cron/schedules; skill + slash + checkpoints | 4 | `12` |
+| ⑤ | PIV loop (Plan→Implement→Validate) | **BUILD** | reuses upstream `checkpoint_manager`; renders PlanCard via ① | 4 | `05` |
+| ⑥ | Knowledge Base (upload + viewer + URL ingest) | **EXTEND** | builds on existing sessions FTS5 search; no 2nd engine | 5 | `06` |
+| ⑦ | Embedded terminal + CLI handoff (Send to opencode) | **BUILD** | binds hermes-desktop's real PTY (`terminal-launcher.ts`) | 6 | `07` |
+| ⑧ | Prompt library / presets | **BUILD** | seeded from `memory/setting/prompts/`; Favorites parked (`08` §8) | 7 | `08` |
+| ⑨ | Saved Artifacts library | **BUILD** | persistent gallery/tab for generated OpenUI artifacts; shares ① renderer | 10 | `09` |
+| ⑩ | Graphiti knowledge graph + Timeline | **BUILD** | the one heavy dep (Neo4j); criteria-first | 11 (last) | `10` |
+| ⑪ | Personal Memory bridge | **ADOPT** | adopt hermes-desktop Memory UI + providers + SOUL.md; port only `/profile /daily /notes /memory` ergonomics | 8 | `11` |
+| ⑫ | Workflows (build + execute) | **EXTEND** | extends existing cron/schedules; skill + slash + checkpoints | 9 | `12` |
 
 > **MVP = ① (Phase 1) on the Phase-0 foundation.** Saved Artifacts is no longer
 > a Phase-1 gate; it is promoted to its own later workspace/library phase.
@@ -116,20 +116,27 @@ launch + interaction). It's the north star for the Workshop + agent-launch flow.
 
 ## 5. Phase / build order
 
-> **MVP = Phase 0 + 1.** Phases 2–6 are the **post-MVP backlog** (build any time,
-> in any order you like — they're independent deltas, not a dependency chain).
+> **MVP = Phase 0 + 1.** From here on, each major feature gets its own phase so
+> the roadmap is easy to grab one slice at a time. The order below is recommended,
+> not sacred; if a feature becomes urgent, move it intentionally and update this
+> table in the same commit.
 
 | Phase | Build | Delivers |
 |-------|-------|----------|
 | **0 — Foundation** 🎯MVP | Fork `hermes-desktop` + pin + strip telemetry + boot `electron-vite dev` + hello-component + SBC Tech skin | A working SBC Tech-skinned desktop app (loop proven) |
 | **1 — Signature** 🎯MVP | OpenUI inline ① (generate + render + interact) | Generative UI in chat |
-| **2 — Cockpit** | Workshop ② (read-only) + token pill ④ | Watch the orchestrator |
-| **3 — Workbench DNA** | Branching ③ + PIV ⑤ | Fork timelines + structured plans |
-| **4 — Knowledge & tools** | KB ⑥ + terminal ⑦ + prompts ⑧ + memory ⑪ + workflows ⑫ | The analyst toolkit + Francis's brain |
-| **5 — Saved workspace** | Saved Artifacts ⑨ | Persistent generated UI gallery/tab |
-| **6 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
+| **2 — Cockpit** | Workshop ② + Token Pill ④ | Watch the orchestrator + usage state |
+| **3 — Branching** | Session branching + lineage tree ③ | Fork conversations into navigable timelines |
+| **4 — PIV Loop** | Plan → Implement → Validate ⑤ | Reviewable, checkpointed work loop |
+| **5 — Knowledge Base** | Upload + URL ingest + viewer + hybrid search ⑥ | Searchable reference corpus |
+| **6 — Terminal Handoff** | Embedded terminal + Send to CLI ⑦ | Hermes → opencode/CLI lane |
+| **7 — Prompt Library** | Saved prompts + variables + chat picker ⑧ | Reusable kickoff library |
+| **8 — Personal Memory Bridge** | `/profile /daily /notes /memory` ergonomics ⑪ | Francis memory muscle memory on Hermes primitives |
+| **9 — Workflows** | Skill-authored workflows + checkpoints + schedules ⑫ | Repeatable procedures |
+| **10 — Saved Artifacts** | Persistent generated UI gallery/tab ⑨ | Saved dashboards/reports/cards |
+| **11 — Graph** | Graphiti ⑩ + Neo4j | Temporal lineage ("how did X evolve") |
 
-> Phase 5 (Polish) folds into each phase's exit criteria (Wibey pass + a11y).
+> Polish is not a numbered phase. Wibey pass + a11y fold into each phase's exit criteria.
 > Workshop read-only, pause, and interrupt are shipped. One-off sub-agent chat is
 > deliberately parked for later and is not required to close Phase 2.
 
@@ -184,8 +191,8 @@ cold:
 - **Phase 2 — Cockpit:** mostly complete. Workshop live view, pause/interrupt
   controls, and Token Pill first pass are committed. One-off sub-agent chat is
   parked for a later steering pass.
-- **Next major phase:** Phase 3 — Branching + PIV, unless a short stabilization
-  pass is chosen first.
+- **Next major phase:** Phase 3 — Branching, unless a short stabilization pass is
+  chosen first. PIV is now its own Phase 4.
 
 ### Original handoff status
 

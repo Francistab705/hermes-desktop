@@ -1,6 +1,6 @@
 # 05 — PIV Loop: Plan → Implement → Validate (Feature ⑤)
 
-> **Phase:** 3 (Workbench DNA) · **Mechanism:** new screen/component module reusing
+> **Phase:** 4 (PIV Loop) · **Mechanism:** new screen/component module reusing
 > `checkpoint_manager` (no fork) · **Source:** DAWG House Epic 29 (shipped 2026-05-31, ADR 0003)
 
 ---

@@ -1,6 +1,6 @@
 # 12 — Workflows: Build + Execute (Feature ⑫)
 
-> **Phase:** 4 (Knowledge & tools) · **Mechanism:** **EXTEND** existing schedules — skills + slash commands +
+> **Phase:** 9 (Workflows) · **Mechanism:** **EXTEND** existing schedules — skills + slash commands +
 > checkpoints (reuses `05` + `11`, no parallel engine) · **Source:** DAWG House
 > Epic 28 (project workflows)
 

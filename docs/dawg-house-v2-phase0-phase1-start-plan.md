@@ -38,8 +38,8 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - Manual screenshot smoke verified the core loop: OpenUI rendered as live UI in
   chat, a follow-up button sent a new user message, and Hermes responded with
   another rendered UI section.
-- Future roadmap work is post-MVP. Next major phase: Phase 3 Branching + PIV,
-  unless a short stabilization pass is chosen first.
+- Future roadmap work is post-MVP. Next major phase: Phase 3 Branching, unless a
+  short stabilization pass is chosen first. PIV is now its own Phase 4.
 
 - Phase 0 is complete and committed: `f9c191d feat: establish SBC Tech phase 0 foundation`.
 - The fork is pinned, `upstream` is configured, dependencies install, and the app boots on macOS.
@@ -53,8 +53,8 @@ Older handoff docs may say `plugin`, `slot`, `web/plugins`, or Hermes `web/` pat
 - Phase 2 has started: Workshop live view, pause/interrupt controls, and Token
   Pill first pass are committed. One-off sub-agent chat is intentionally parked
   for later.
-- Next major roadmap item is Phase 3: Branching + PIV, unless a stabilization
-  pass is chosen first.
+- Next major roadmap item is Phase 3: Branching, unless a stabilization pass is
+  chosen first. PIV follows as Phase 4.
 
 ## Pinned Fork Base
 
@@ -365,13 +365,13 @@ SBC Tech v2 is ready to move beyond the MVP queue when all of these are true:
 ## Deferred Until After MVP
 
 - Workshop one-off sub-agent chat.
-- Saved Artifacts library/tab.
-- Branching and lineage.
-- PIV.
-- Knowledge Base.
-- Terminal handoff.
-- Prompt library.
-- Personal memory bridge.
-- Workflows.
-- Knowledge graph.
+- Phase 3: Branching and lineage.
+- Phase 4: PIV.
+- Phase 5: Knowledge Base.
+- Phase 6: Terminal handoff.
+- Phase 7: Prompt library.
+- Phase 8: Personal memory bridge.
+- Phase 9: Workflows.
+- Phase 10: Saved Artifacts library/tab.
+- Phase 11: Knowledge graph.
 - Reachy Mini.

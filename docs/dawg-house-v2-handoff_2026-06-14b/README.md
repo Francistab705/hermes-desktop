@@ -20,11 +20,17 @@ Then work the feature docs in phase order.
 | Phase | Docs |
 |-------|------|
 | 0 — Foundation | `00` §6 |
-| 1 — Signature | `01_OPENUI_INLINE`, `09_ARTIFACTS` |
+| 1 — Signature | `01_OPENUI_INLINE` |
 | 2 — Cockpit | `02_WORKSHOP`, `04_TOKEN_PILL` |
-| 3 — Workbench DNA | `03_BRANCHING`, `05_PIV` |
-| 4 — Knowledge & tools | `06_KNOWLEDGE_BASE`, `07_TERMINAL`, `08_PROMPT_LIBRARY`, `11_PERSONAL_MEMORY`, `12_WORKFLOWS` |
-| 6 — Graph (last) | `10_KNOWLEDGE_GRAPH` |
+| 3 — Branching | `03_BRANCHING` |
+| 4 — PIV Loop | `05_PIV` |
+| 5 — Knowledge Base | `06_KNOWLEDGE_BASE` |
+| 6 — Terminal Handoff | `07_TERMINAL` |
+| 7 — Prompt Library | `08_PROMPT_LIBRARY` |
+| 8 — Personal Memory Bridge | `11_PERSONAL_MEMORY` |
+| 9 — Workflows | `12_WORKFLOWS` |
+| 10 — Saved Artifacts | `09_ARTIFACTS` |
+| 11 — Graph (last) | `10_KNOWLEDGE_GRAPH` |
 
 Appendix: `APPENDIX_HERMES_DESKTOP.md` — **base-choice deep dive (GO)**: why we
 fork hermes-desktop, the OpenUI fork surface, fork cost, and risks. **Read with `00`.**
@@ -45,6 +51,6 @@ never build a parallel system** (adopt/extend what hermes-desktop already ships)
 3. Re-skin via the existing `ThemeProvider` + Tailwind tokens, not hand-edited styles.
 4. Reuse primitives — no parallel systems (PIV/Workflows → `checkpoint_manager`;
    Memory → adopt hermes-desktop memory + `session_search`; Workshop → `delegation.status`).
-5. One OpenUI renderer, two mounts (inline `01` + canvas `09`).
+5. One OpenUI renderer, reused everywhere (inline `01` + saved artifacts `09`).
 6. WCAG 2.2 AA everywhere.
 7. Personal project → no Element Gateway / LLM-boundary constraint; bring-your-own-model.

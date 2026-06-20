@@ -1,6 +1,6 @@
 # 11 — Personal Memory Bridge (Feature ⑪)
 
-> **Phase:** 4 (Knowledge & tools) · **Mechanism:** **Approach C (hybrid)** —
+> **Phase:** 8 (Personal Memory Bridge) · **Mechanism:** **Approach C (hybrid)** —
 > Hermes OWNS the store; we port only Francis's distinctive *ergonomics* as a thin
 > layer · This is the richest-specced feature (4 banked decision drawers).
 
