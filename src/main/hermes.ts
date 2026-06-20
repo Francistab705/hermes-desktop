@@ -864,7 +864,9 @@ export async function getTuiDelegationStatus(
   profile?: string,
 ): Promise<TuiDelegationStatus> {
   if (isRemoteMode()) {
-    throw new Error("Workshop delegation status is only available for local profiles.");
+    throw new Error(
+      "Workshop delegation status is only available for local profiles.",
+    );
   }
   if (!shouldUseTuiGatewayClient()) {
     return { active: [], paused: false };
@@ -941,7 +943,11 @@ export async function loadTuiSpawnTree(
   if (isRemoteMode()) {
     throw new Error("Workshop history is only available for local profiles.");
   }
-  return getTuiGatewayClient(profile).request("spawn_tree.load", { path }, 10_000);
+  return getTuiGatewayClient(profile).request(
+    "spawn_tree.load",
+    { path },
+    10_000,
+  );
 }
 
 const CAPABILITIES_TIMEOUT_MS = 350;
@@ -1250,7 +1256,9 @@ function openUISystemMessage(): { role: "system"; content: string } {
   return { role: "system", content: OPENUI_SYSTEM_INSTRUCTIONS };
 }
 
-function combineInstructions(...values: Array<string | null | undefined>): string {
+function combineInstructions(
+  ...values: Array<string | null | undefined>
+): string {
   return values.filter(Boolean).join("\n\n");
 }
 
@@ -2585,13 +2593,13 @@ async function sendMessageViaNonGatewayApi(
       return sendMessageViaRuns(
         message,
         cb,
-          profile,
-          resumeSessionId,
-          history,
-          attachments,
-          contextFolder,
-        );
-      }
+        profile,
+        resumeSessionId,
+        history,
+        attachments,
+        contextFolder,
+      );
+    }
   }
 
   return sendMessageViaApi(

@@ -5,6 +5,7 @@ import { ChatEmptyState } from "./ChatEmptyState";
 import { MessageList } from "./MessageList";
 import { ModelPicker } from "./ModelPicker";
 import { ReasoningEffortPicker } from "./ReasoningEffortPicker";
+import { TokenPill } from "./TokenPill";
 import { ContextFolderChip } from "./ContextFolderChip";
 import { WorktreePanel } from "./WorktreePanel";
 import { ArtifactsCanvas } from "../../components/ArtifactsCanvas";
@@ -563,6 +564,20 @@ function Chat({
       onDrop={handleDrop}
     >
       <ConfigHealthBanner profile={profile} onOpenDiagnose={onOpenDiagnose} />
+
+      <div className="chat-header" aria-label="Chat status">
+        <div className="chat-header-title">
+          {modelConfig.displayModel || modelConfig.currentModel || "Hermes"}
+        </div>
+        <div className="chat-header-actions">
+          <TokenPill
+            usage={usage}
+            contextUsage={contextUsage}
+            model={modelConfig.currentModel}
+            provider={modelConfig.currentProvider}
+          />
+        </div>
+      </div>
 
       <div className="chat-body">
         <div className="chat-messages" ref={containerRef}>

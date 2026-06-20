@@ -21,6 +21,15 @@ export interface WorkshopStatus {
   error?: string;
 }
 
+export interface WorkshopPauseResult {
+  paused: boolean;
+}
+
+export interface WorkshopInterruptResult {
+  found: boolean;
+  subagentId: string;
+}
+
 /** One saved delegation run, as listed in the Workshop history panel. */
 export interface WorkshopHistoryEntry {
   /** Absolute path of the snapshot file (used as the load handle + key). */

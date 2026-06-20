@@ -109,6 +109,8 @@ import {
   saveWorkshopHistory,
   listWorkshopHistory,
   loadWorkshopHistory,
+  setWorkshopPaused,
+  interruptWorkshopSubagent,
 } from "./workshop";
 import {
   startSshTunnel,
@@ -189,10 +191,7 @@ import {
   remoteUpdateSessionTitle,
   type RemoteSessionConfig,
 } from "./remote-sessions";
-import {
-  remoteGetHermesHome,
-  remoteGetHermesVersion,
-} from "./remote-metadata";
+import { remoteGetHermesHome, remoteGetHermesVersion } from "./remote-metadata";
 import {
   remoteAddModel,
   remoteGetModelConfig,
@@ -227,7 +226,12 @@ import {
   removeMemoryEntry,
   writeUserProfile,
 } from "./memory";
-import { readSoul, writeSoul, resetSoul, ensureOpenUIGuidanceInSoul } from "./soul";
+import {
+  readSoul,
+  writeSoul,
+  resetSoul,
+  ensureOpenUIGuidanceInSoul,
+} from "./soul";
 import {
   getPlatformToolsets,
   getToolsets,
@@ -1149,17 +1153,11 @@ function setupIPC(): void {
 
   ipcMain.handle(
     "set-connection-chat-transports",
-    (
-      _event,
-      remoteChatTransport: unknown,
-      sshChatTransport: unknown,
-    ) => {
+    (_event, remoteChatTransport: unknown, sshChatTransport: unknown) => {
       const current = getConnectionConfig();
       setConnectionConfig({
         ...current,
-        remoteChatTransport: normalizeRemoteChatTransport(
-          remoteChatTransport,
-        ),
+        remoteChatTransport: normalizeRemoteChatTransport(remoteChatTransport),
         sshChatTransport: normalizeRemoteChatTransport(sshChatTransport),
       });
       notifyConnectionConfigChanged();
@@ -1618,6 +1616,16 @@ function setupIPC(): void {
     listWorkshopHistory(profile),
   );
   ipcMain.handle(
+    "workshop-pause",
+    (_event, paused: boolean, profile?: string) =>
+      setWorkshopPaused(profile, paused),
+  );
+  ipcMain.handle(
+    "workshop-subagent-interrupt",
+    (_event, subagentId: string, profile?: string) =>
+      interruptWorkshopSubagent(profile, subagentId),
+  );
+  ipcMain.handle(
     "workshop-history-load",
     (_event, path: string, profile?: string) =>
       loadWorkshopHistory(profile, path),
@@ -1781,8 +1789,7 @@ function setupIPC(): void {
   // Sessions
   ipcMain.handle("list-sessions", (_event, limit?: number, offset?: number) => {
     const conn = getConnectionConfig();
-    if (conn.mode === "remote")
-      return remoteListSessions(conn, limit, offset);
+    if (conn.mode === "remote") return remoteListSessions(conn, limit, offset);
     if (conn.mode === "ssh" && conn.ssh)
       return withSshDashboardSessions(
         conn,
@@ -1815,11 +1822,7 @@ function setupIPC(): void {
 
   ipcMain.handle(
     "record-session-continuation",
-    (
-      _event,
-      sessionId: string,
-      items: DesktopSessionContinuationItem[],
-    ) => {
+    (_event, sessionId: string, items: DesktopSessionContinuationItem[]) => {
       persistSessionContinuation(sessionId, items);
       return true;
     },
@@ -2066,8 +2069,7 @@ function setupIPC(): void {
   // Session search
   ipcMain.handle("search-sessions", (_event, query: string, limit?: number) => {
     const conn = getConnectionConfig();
-    if (conn.mode === "remote")
-      return remoteSearchSessions(conn, query, limit);
+    if (conn.mode === "remote") return remoteSearchSessions(conn, query, limit);
     if (conn.mode === "ssh" && conn.ssh)
       return withSshDashboardSessions(
         conn,

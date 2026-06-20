@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import Workshop from "./Workshop";
 import type { WorkshopStatus } from "../../../../shared/workshop";
@@ -115,5 +115,81 @@ describe("Workshop", () => {
 
     expect(await screen.findByText("delegate_task")).toBeInTheDocument();
     expect(screen.getByText("Live")).toBeInTheDocument();
+  });
+
+  it("pauses delegation spawning", async () => {
+    const status: WorkshopStatus = {
+      available: true,
+      source: "dashboard",
+      checkedAt: 1,
+      events: [],
+      paused: false,
+    };
+    window.hermesAPI = {
+      getWorkshopStatus: vi.fn().mockResolvedValue(status),
+      setWorkshopPaused: vi.fn().mockResolvedValue({ paused: true }),
+      interruptWorkshopSubagent: vi.fn(),
+      listWorkshopHistory: vi.fn().mockResolvedValue([]),
+      loadWorkshopHistory: vi.fn(),
+    } as unknown as typeof window.hermesAPI;
+
+    render(<Workshop profile="default" />);
+
+    fireEvent.click(await screen.findByText("Pause Delegation"));
+
+    await waitFor(() =>
+      expect(window.hermesAPI.setWorkshopPaused).toHaveBeenCalledWith(
+        true,
+        "default",
+      ),
+    );
+    expect(
+      await screen.findByText(/New delegation spawns are paused/),
+    ).toBeInTheDocument();
+  });
+
+  it("interrupts a running sub-agent", async () => {
+    const status: WorkshopStatus = {
+      available: true,
+      source: "dashboard",
+      checkedAt: 1,
+      events: [],
+    };
+    window.hermesAPI = {
+      getWorkshopStatus: vi.fn().mockResolvedValue(status),
+      setWorkshopPaused: vi.fn(),
+      interruptWorkshopSubagent: vi.fn().mockResolvedValue({
+        found: true,
+        subagentId: "sa-1",
+      }),
+      listWorkshopHistory: vi.fn().mockResolvedValue([]),
+      loadWorkshopHistory: vi.fn(),
+    } as unknown as typeof window.hermesAPI;
+
+    render(
+      <Workshop
+        profile="default"
+        liveEvents={[
+          {
+            id: "sa-1",
+            agent: "Subagent",
+            status: "running",
+            title: "Research docs",
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(await screen.findByText("Interrupt"));
+
+    await waitFor(() =>
+      expect(window.hermesAPI.interruptWorkshopSubagent).toHaveBeenCalledWith(
+        "sa-1",
+        "default",
+      ),
+    );
+    expect(
+      await screen.findByText("Interrupt requested for sa-1."),
+    ).toBeInTheDocument();
   });
 });

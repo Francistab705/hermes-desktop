@@ -1,3 +1,4 @@
+import WebSocket from "ws";
 import {
   getTuiDelegationStatus,
   getTuiRecentDelegationEvents,
@@ -5,17 +6,26 @@ import {
   listTuiSpawnTrees,
   loadTuiSpawnTree,
 } from "./hermes";
+import { startDashboard } from "./dashboard";
 import type { GatewayEvent } from "./tui-gateway-stream";
 import type { ChatToolEvent } from "../shared/chat-stream";
 import type {
   WorkshopDelegationEvent,
   WorkshopHistoryDetail,
   WorkshopHistoryEntry,
+  WorkshopInterruptResult,
+  WorkshopPauseResult,
   WorkshopStatus,
 } from "../shared/workshop";
 
 const RECENT_EVENT_LIMIT = 40;
 const observedToolEvents = new Map<string, WorkshopDelegationEvent[]>();
+
+interface WorkshopRpcFrame {
+  id?: string | number;
+  result?: unknown;
+  error?: { message?: string };
+}
 
 function profileEventKey(profile?: string): string {
   return profile && profile !== "default" ? profile : "default";
@@ -26,12 +36,12 @@ function stringValue(value: unknown): string {
 }
 
 function numberValue(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
-function normalizeStatus(
-  value: unknown,
-): WorkshopDelegationEvent["status"] {
+function normalizeStatus(value: unknown): WorkshopDelegationEvent["status"] {
   return value === "queued" ||
     value === "running" ||
     value === "completed" ||
@@ -73,7 +83,8 @@ function mapRecentDelegationEvent(
   const payload = event.payload ?? {};
   const subagentId = stringValue(payload.subagent_id);
   const toolId = stringValue(payload.tool_id);
-  const id = subagentId || toolId || `${event.session_id || "session"}:${event.type}`;
+  const id =
+    subagentId || toolId || `${event.session_id || "session"}:${event.type}`;
   const model = stringValue(payload.model);
   const goal = stringValue(payload.goal) || stringValue(payload.context);
   const text =
@@ -124,7 +135,9 @@ function mapRecentDelegationEvent(
       numberValue(payload.tool_count) != null
         ? `tools used: ${numberValue(payload.tool_count)}`
         : "",
-      numberValue(payload.depth) != null ? `depth: ${numberValue(payload.depth)}` : "",
+      numberValue(payload.depth) != null
+        ? `depth: ${numberValue(payload.depth)}`
+        : "",
     ]
       .filter(Boolean)
       .join(" · "),
@@ -142,13 +155,78 @@ function mergeEvents(
   return [...byId.values()];
 }
 
+function wsDataToString(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (Buffer.isBuffer(data)) return data.toString("utf8");
+  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
+  return String(data);
+}
+
+async function requestWorkshopRpc<T>(
+  profile: string | undefined,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<T> {
+  const status = await startDashboard(profile);
+  if (!status.running || !status.connection?.wsUrl) {
+    throw new Error(status.error || "Hermes dashboard is not running.");
+  }
+
+  const id = `workshop-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const ws = new WebSocket(status.connection.wsUrl);
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ws.close();
+      reject(new Error(`Workshop RPC timed out: ${method}`));
+    }, 10_000);
+    timer.unref?.();
+
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      ws.removeAllListeners();
+      if (ws.readyState === WebSocket.OPEN) ws.close();
+    };
+
+    ws.on("open", () => {
+      ws.send(JSON.stringify({ id, jsonrpc: "2.0", method, params }));
+    });
+    ws.on("message", (data) => {
+      let frame: WorkshopRpcFrame;
+      try {
+        frame = JSON.parse(wsDataToString(data)) as WorkshopRpcFrame;
+      } catch {
+        return;
+      }
+      if (String(frame.id ?? "") !== id) return;
+      cleanup();
+      if (frame.error) {
+        reject(new Error(frame.error.message || "Workshop RPC failed"));
+        return;
+      }
+      resolve(frame.result as T);
+    });
+    ws.on("error", (err) => {
+      cleanup();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    });
+    ws.on("close", () => {
+      cleanup();
+      reject(new Error("Workshop RPC connection closed."));
+    });
+  });
+}
+
 export function recordWorkshopToolEvent(
   profile: string | undefined,
   runId: string,
   event: ChatToolEvent,
 ): void {
   const name = event.name || event.label || "";
-  const text = [event.preview, event.result, event.label].filter(Boolean).join(" ");
+  const text = [event.preview, event.result, event.label]
+    .filter(Boolean)
+    .join(" ");
   const looksLikeDelegation =
     name === "delegate_task" ||
     name.startsWith("subagent") ||
@@ -163,7 +241,8 @@ export function recordWorkshopToolEvent(
     agent: name === "delegate_task" ? "Main agent" : "Subagent",
     status: event.status,
     title: event.label || name || "Delegation event",
-    detail: event.result || event.preview || "Observed from desktop chat stream.",
+    detail:
+      event.result || event.preview || "Observed from desktop chat stream.",
     timestamp: Date.now(),
     source: "event",
   });
@@ -199,7 +278,10 @@ export async function getWorkshopStatus(
       .map(mapRecentDelegationEvent)
       .filter((event): event is WorkshopDelegationEvent => event !== null);
     const observedEvents = observedToolEvents.get(key) ?? [];
-    const events = mergeEvents(activeEvents, [...recentEvents, ...observedEvents]);
+    const events = mergeEvents(activeEvents, [
+      ...recentEvents,
+      ...observedEvents,
+    ]);
     return {
       available: true,
       source: "dashboard",
@@ -217,7 +299,8 @@ export async function getWorkshopStatus(
     // transport instead of the TUI gateway). Fall back to whatever the
     // chat-stream observer has recorded so Workshop still shows evidence
     // of delegate_task activity.
-    const observedEvents = observedToolEvents.get(profileEventKey(profile)) ?? [];
+    const observedEvents =
+      observedToolEvents.get(profileEventKey(profile)) ?? [];
     return {
       available: observedEvents.length > 0,
       source: observedEvents.length > 0 ? "dashboard" : "unavailable",
@@ -229,6 +312,34 @@ export async function getWorkshopStatus(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+export async function setWorkshopPaused(
+  profile: string | undefined,
+  paused: boolean,
+): Promise<WorkshopPauseResult> {
+  const result = await requestWorkshopRpc<{ paused?: boolean }>(
+    profile,
+    "delegation.pause",
+    { paused },
+  );
+  return { paused: result.paused === true };
+}
+
+export async function interruptWorkshopSubagent(
+  profile: string | undefined,
+  subagentId: string,
+): Promise<WorkshopInterruptResult> {
+  const id = subagentId.trim();
+  if (!id) throw new Error("subagentId is required");
+  const result = await requestWorkshopRpc<{
+    found?: boolean;
+    subagent_id?: string;
+  }>(profile, "subagent.interrupt", { subagent_id: id });
+  return {
+    found: result.found === true,
+    subagentId: stringValue(result.subagent_id) || id,
+  };
 }
 
 // ── History (saved delegation trees) ─────────────────────────────────

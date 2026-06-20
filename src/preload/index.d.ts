@@ -6,6 +6,8 @@ import type {
   WorkshopStatus,
   WorkshopHistoryEntry,
   WorkshopHistoryDetail,
+  WorkshopPauseResult,
+  WorkshopInterruptResult,
 } from "../shared/workshop";
 import type {
   RegistryKind,
@@ -478,6 +480,14 @@ interface HermesAPI {
   startDashboard: (profile?: string) => Promise<DashboardStatus>;
   stopDashboard: (profile?: string) => Promise<boolean>;
   getWorkshopStatus: (profile?: string) => Promise<WorkshopStatus>;
+  setWorkshopPaused: (
+    paused: boolean,
+    profile?: string,
+  ) => Promise<WorkshopPauseResult>;
+  interruptWorkshopSubagent: (
+    subagentId: string,
+    profile?: string,
+  ) => Promise<WorkshopInterruptResult>;
   listWorkshopHistory: (profile?: string) => Promise<WorkshopHistoryEntry[]>;
   loadWorkshopHistory: (
     path: string,

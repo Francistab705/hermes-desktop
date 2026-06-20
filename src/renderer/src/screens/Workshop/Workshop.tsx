@@ -47,9 +47,13 @@ function mergeEvents(
 function DelegationTree({
   events,
   available,
+  busySubagentId,
+  onInterrupt,
 }: {
   events: WorkshopDelegationEvent[];
   available: boolean;
+  busySubagentId?: string | null;
+  onInterrupt?: (subagentId: string) => void;
 }): React.JSX.Element {
   const roots = useMemo(
     () => events.filter((event) => !event.parentId),
@@ -85,9 +89,23 @@ function DelegationTree({
           <div className="workshop-node-body">
             <div className="workshop-node-header">
               <strong>{event.title || event.agent}</strong>
-              <span className={`workshop-badge workshop-badge-${event.status}`}>
-                {statusLabel(event.status)}
-              </span>
+              <div className="workshop-node-actions">
+                <span
+                  className={`workshop-badge workshop-badge-${event.status}`}
+                >
+                  {statusLabel(event.status)}
+                </span>
+                {onInterrupt && event.status === "running" ? (
+                  <button
+                    className="btn btn-secondary workshop-node-action"
+                    type="button"
+                    disabled={busySubagentId === event.id}
+                    onClick={() => onInterrupt(event.id)}
+                  >
+                    {busySubagentId === event.id ? "Interrupting" : "Interrupt"}
+                  </button>
+                ) : null}
+              </div>
             </div>
             {event.detail ? <p>{event.detail}</p> : null}
           </div>
@@ -105,6 +123,9 @@ function Workshop({
   const [status, setStatus] = useState<WorkshopStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [pauseBusy, setPauseBusy] = useState(false);
+  const [busySubagentId, setBusySubagentId] = useState<string | null>(null);
   const [history, setHistory] = useState<WorkshopHistoryEntry[]>([]);
   // When set, the panels show this saved run instead of the live stream.
   const [viewingPath, setViewingPath] = useState<string | null>(null);
@@ -123,6 +144,57 @@ function Workshop({
       setLoading(false);
     }
   }, [profile]);
+
+  const setPaused = useCallback(
+    async (paused: boolean): Promise<void> => {
+      setPauseBusy(true);
+      setError(null);
+      setActionMessage(null);
+      try {
+        const result = await window.hermesAPI.setWorkshopPaused(
+          paused,
+          profile,
+        );
+        setStatus((prev) => (prev ? { ...prev, paused: result.paused } : prev));
+        setActionMessage(
+          result.paused
+            ? "New delegation spawns are paused. Active sub-agents keep running."
+            : "Delegation spawning resumed.",
+        );
+        void refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setPauseBusy(false);
+      }
+    },
+    [profile, refresh],
+  );
+
+  const interruptSubagent = useCallback(
+    async (subagentId: string): Promise<void> => {
+      setBusySubagentId(subagentId);
+      setError(null);
+      setActionMessage(null);
+      try {
+        const result = await window.hermesAPI.interruptWorkshopSubagent(
+          subagentId,
+          profile,
+        );
+        setActionMessage(
+          result.found
+            ? `Interrupt requested for ${result.subagentId}.`
+            : `No active sub-agent found for ${result.subagentId}.`,
+        );
+        void refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusySubagentId(null);
+      }
+    },
+    [profile, refresh],
+  );
 
   const refreshHistory = useCallback(async (): Promise<void> => {
     try {
@@ -186,6 +258,7 @@ function Workshop({
   const viewingEntry = isViewing
     ? history.find((entry) => entry.path === viewingPath)
     : undefined;
+  const controlsDisabled = isViewing || pauseBusy;
 
   return (
     <section className="workshop-screen" aria-labelledby="workshop-title">
@@ -195,8 +268,8 @@ function Workshop({
           <h1 id="workshop-title">Workshop</h1>
           <p>
             Watch Hermes delegation traffic as the main agent fans work out to
-            sub-agents. Read-only first; pause and interrupt come after the
-            stream is proven.
+            sub-agents. Pause new spawns or interrupt a running sub-agent when a
+            long task needs steering.
           </p>
           <p className="workshop-profile-note">
             Watching profile: <strong>{profile || "default"}</strong>
@@ -212,15 +285,25 @@ function Workshop({
             Back to live
           </button>
         ) : (
-          <button
-            className="btn btn-secondary"
-            type="button"
-            onClick={() => void refresh()}
-            disabled={loading}
-          >
-            <Refresh size={15} className={loading ? "spin" : undefined} />
-            Refresh
-          </button>
+          <div className="workshop-header-actions">
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => void setPaused(!status?.paused)}
+              disabled={controlsDisabled}
+            >
+              {status?.paused ? "Resume Delegation" : "Pause Delegation"}
+            </button>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading}
+            >
+              <Refresh size={15} className={loading ? "spin" : undefined} />
+              Refresh
+            </button>
+          </div>
         )}
       </header>
 
@@ -263,6 +346,13 @@ function Workshop({
         </div>
       )}
 
+      {!isViewing && actionMessage && (
+        <div className="workshop-notice" role="status">
+          <strong>Workshop action sent</strong>
+          <span>{actionMessage}</span>
+        </div>
+      )}
+
       {isViewing && (
         <div className="workshop-notice" role="status">
           <strong>Viewing saved run</strong>
@@ -288,6 +378,8 @@ function Workshop({
           <DelegationTree
             events={events}
             available={isViewing || status?.available === true}
+            busySubagentId={busySubagentId}
+            onInterrupt={isViewing ? undefined : interruptSubagent}
           />
         </section>
 
@@ -297,7 +389,7 @@ function Workshop({
         >
           <div className="workshop-panel-header">
             <h2 id="delegation-stream-title">Message Stream</h2>
-            <span>read-only event log</span>
+            <span>live event log</span>
           </div>
           {events.length === 0 ? (
             <div className="workshop-stream-empty">

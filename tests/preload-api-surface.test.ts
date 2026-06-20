@@ -115,6 +115,20 @@ describe("New APIs from v0.8/v0.9 features", () => {
     expect(preloadMethods).toContain("setConnectionChatTransports");
     expect(typeMethods).toContain("setConnectionChatTransports");
   });
+
+  it("has Workshop APIs", () => {
+    for (const method of [
+      "getWorkshopStatus",
+      "setWorkshopPaused",
+      "interruptWorkshopSubagent",
+      "listWorkshopHistory",
+      "loadWorkshopHistory",
+      "saveWorkshopHistory",
+    ]) {
+      expect(preloadMethods).toContain(method);
+      expect(typeMethods).toContain(method);
+    }
+  });
 });
 
 // ─── Legacy APIs still present ──────────────────────────

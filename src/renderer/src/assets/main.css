@@ -607,6 +607,13 @@ body {
   color: var(--accent-text);
 }
 
+.workshop-header-actions,
+.workshop-node-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .workshop-status-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(140px, 1fr));
@@ -749,6 +756,12 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.workshop-node-action {
+  min-height: 28px;
+  padding: 4px 9px;
+  font-size: 12px;
 }
 
 .workshop-node p {
@@ -2951,6 +2964,106 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.token-pill-wrap {
+  position: relative;
+}
+
+.token-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.token-pill:hover,
+.token-pill:focus-visible {
+  border-color: var(--accent);
+}
+
+.token-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-muted);
+}
+
+.token-pill-main {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.token-pill-state {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.token-pill-ok .token-pill-dot {
+  background: var(--success);
+}
+
+.token-pill-warn .token-pill-dot {
+  background: var(--warning);
+}
+
+.token-pill-critical .token-pill-dot {
+  background: var(--error);
+}
+
+.token-pill-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(320px, calc(100vw - 40px));
+  padding: 14px;
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.token-pill-popover-title {
+  margin-bottom: 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.token-pill-popover dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.token-pill-popover dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.token-pill-popover dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.token-pill-popover dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
 }
 
 .chat-clear-btn {

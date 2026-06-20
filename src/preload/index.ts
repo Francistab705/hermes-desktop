@@ -7,6 +7,8 @@ import type {
   WorkshopStatus,
   WorkshopHistoryEntry,
   WorkshopHistoryDetail,
+  WorkshopPauseResult,
+  WorkshopInterruptResult,
 } from "../shared/workshop";
 import type {
   MessagingPlatformsResponse,
@@ -315,7 +317,8 @@ const hermesAPI = {
         },
       );
     ipcRenderer.on("connection-config-changed", handler);
-    return () => ipcRenderer.removeListener("connection-config-changed", handler);
+    return () =>
+      ipcRenderer.removeListener("connection-config-changed", handler);
   },
 
   setSshConfig: (
@@ -655,6 +658,16 @@ const hermesAPI = {
     ipcRenderer.invoke("stop-dashboard", profile),
   getWorkshopStatus: (profile?: string): Promise<WorkshopStatus> =>
     ipcRenderer.invoke("workshop-status", profile),
+  setWorkshopPaused: (
+    paused: boolean,
+    profile?: string,
+  ): Promise<WorkshopPauseResult> =>
+    ipcRenderer.invoke("workshop-pause", paused, profile),
+  interruptWorkshopSubagent: (
+    subagentId: string,
+    profile?: string,
+  ): Promise<WorkshopInterruptResult> =>
+    ipcRenderer.invoke("workshop-subagent-interrupt", subagentId, profile),
   listWorkshopHistory: (profile?: string): Promise<WorkshopHistoryEntry[]> =>
     ipcRenderer.invoke("workshop-history-list", profile),
   loadWorkshopHistory: (
