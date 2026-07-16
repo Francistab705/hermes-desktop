@@ -52,6 +52,7 @@ interface ChatInputProps {
   hasSession: boolean;
   sessionId?: string | null;
   remoteMode?: boolean;
+  connectionMode?: "local" | "remote" | "ssh";
   /** Active profile — used to resolve the provider for voice transcription. */
   profile?: string;
   /** Context-window occupancy for the gauge; null until the first response. */
@@ -75,6 +76,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       hasSession,
       sessionId,
       remoteMode,
+      connectionMode = "local",
       profile,
       contextUsage,
       readiness,
@@ -492,6 +494,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const canSend =
       (input.trim().length > 0 || attachments.length > 0) && readinessOk;
 
+    const connectionLabel = connectionMode.toUpperCase();
+
     // Map fixLocation → user-facing call to action. The strings are
     // wrapped in i18n; the location ids come from main/validation.ts.
     function readinessFixLabel(loc: string | undefined): string {
@@ -649,7 +653,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             {voice.error}
           </div>
         )}
-        <div className="chat-input-wrapper">
+        <div
+          className={`chat-input-wrapper chat-input-wrapper-${connectionMode}`}
+        >
           <input
             ref={fileInputRef}
             type="file"
@@ -675,6 +681,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             autoFocus
           />
           <div className="chat-input-toolbar">
+            <span
+              className="chat-connection-badge"
+              aria-label={`Connection mode: ${connectionLabel}`}
+            >
+              {connectionLabel}
+            </span>
             <button
               className="chat-attach-btn"
               onClick={() => fileInputRef.current?.click()}

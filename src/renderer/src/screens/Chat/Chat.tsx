@@ -1045,6 +1045,7 @@ function Chat({
           hasSession={!!hermesSessionId}
           sessionId={hermesSessionId}
           remoteMode={remoteMode}
+          connectionMode={connectionMode}
           profile={profile}
           contextUsage={contextUsage}
           readiness={readiness}

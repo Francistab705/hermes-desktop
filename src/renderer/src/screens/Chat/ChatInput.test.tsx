@@ -18,6 +18,7 @@ afterEach(cleanup);
 
 function renderInput(
   slashCommands?: React.ComponentProps<typeof ChatInput>["slashCommands"],
+  props: Partial<React.ComponentProps<typeof ChatInput>> = {},
 ): {
   onSubmit: ReturnType<typeof vi.fn>;
   textarea: HTMLTextAreaElement;
@@ -31,6 +32,7 @@ function renderInput(
       onQuickAsk={vi.fn()}
       onAbort={vi.fn()}
       slashCommands={slashCommands}
+      {...props}
     />,
   );
   const textarea = screen.getByPlaceholderText(
@@ -119,5 +121,18 @@ describe("ChatInput — slash command palette", () => {
     fireEvent.keyDown(textarea, { key: "ArrowUp" });
     expect(screen.getByText("command-999")).toBeTruthy();
     expect(screen.queryByText("command-0")).toBeNull();
+  });
+});
+
+describe("ChatInput — connection mode indicator", () => {
+  it("marks the composer as an SSH session", () => {
+    renderInput(undefined, { connectionMode: "ssh" });
+
+    expect(screen.getByLabelText("Connection mode: SSH")).toBeTruthy();
+    expect(
+      screen
+        .getByLabelText("Connection mode: SSH")
+        .closest(".chat-input-wrapper"),
+    )?.toHaveClass("chat-input-wrapper-ssh");
   });
 });

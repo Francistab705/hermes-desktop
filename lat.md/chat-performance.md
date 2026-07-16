@@ -40,6 +40,12 @@ The composer textarea auto-grows to its content. Reading `scrollHeight` to size 
 
 In [[src/renderer/src/screens/Chat/ChatInput.tsx]] every path that changes the value (typing, history recall, voice transcription, and the imperative `setText`/`appendText`) goes through `setInput`, so the layout effect is the single owner of resizing — the other paths only set the caret and focus. Combined with the row-level `content-visibility`, the one measurement per keystroke stays O(visible rows).
 
+## Composer connection-mode cue
+
+The chat composer shows the active connection mode so local and SSH sessions are visually distinct before sending a prompt.
+
+[[src/renderer/src/screens/Chat/Chat.tsx]] loads the persisted connection mode and passes it to [[src/renderer/src/screens/Chat/ChatInput.tsx]]. The input wrapper receives a mode-specific class, and the bottom toolbar renders a compact `LOCAL`, `SSH`, or `REMOTE` badge. The CSS in `src/renderer/src/assets/main.css` colors the wrapper border and lower edge green for local, amber for SSH, and blue for direct remote.
+
 ## Slash command palette uses fixed-row virtualization
 
 Large Agent command catalogs must not make opening, filtering, scrolling, or keyboard navigation proportional to the number of mounted command elements.
