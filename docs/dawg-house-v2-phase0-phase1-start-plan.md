@@ -370,8 +370,95 @@ SBC Tech v2 is ready to move beyond the MVP queue when all of these are true:
 - Phase 6: Terminal handoff.
 - Phase 7: Prompt library.
 - Phase 8: Personal memory bridge.
-- Phase 9: Workflows.
+- Phase 9: Workflows (superseded by Phase 13 Archon).
 - Phase 10: Saved Artifacts library/tab.
 - Phase 11: One-off sub-agent chat.
-- Phase 12: Knowledge graph.
+- Phase 12: Knowledge graph (superseded by Phase 14 Graphiti).
+- Phase 13: Archon Integration.
+- Phase 14: Graphiti Integration.
 - Reachy Mini.
+
+## Phase 13: Archon Integration
+
+Goal: Embed the Archon workflow engine UI as a top-level tab alongside Workshop,
+replacing the need to build a custom workflow system (Phase 9).
+
+### Why Archon
+
+Archon (https://github.com/coleam00/archon) provides:
+
+- **Deterministic YAML-defined workflows** - same structure every run
+- **Git worktree isolation** - parallel agent runs without branch conflicts
+- **Human approval gates** - built into workflow nodes
+- **Pre-built workflows**: `archon-piv-loop`, `archon-fix-github-issue`, `archon-idea-to-pr`
+- **Multi-platform**: CLI, Web UI, Slack, Telegram, GitHub, Discord
+
+This effectively gives us Phase 3 (Branching), Phase 4 (PIV), and Phase 9 (Workflows)
+capabilities without building them from scratch.
+
+### Work
+
+- Add `archon` to the `View` type in `Layout.tsx`.
+- Add Archon nav item with a workflow-style icon (e.g., `GitBranch` or `Workflow`).
+- Create `src/renderer/src/screens/Archon/Archon.tsx` with an Electron `<webview>`.
+- Use `partition: "archon"` for session isolation.
+- Add Archon pane to Layout render with lazy mount pattern.
+- Configure main process `will-attach-webview` to allow Archon partition.
+- Add settings for Archon URL (default: `http://localhost:8080` or configurable).
+- Add connection status indicator (running/not running).
+
+### Acceptance Criteria
+
+- Archon tab appears in sidebar alongside Workshop.
+- Clicking the tab loads the Archon web UI in an embedded webview.
+- Archon workflows are visible and interactive.
+- Webview is isolated from other partitions.
+- Configurable URL in Settings for remote Archon instances.
+
+### Dependencies
+
+- None (can start immediately).
+- Archon must be running separately (not bundled).
+
+### Suggested Verification
+
+- `npm run typecheck`
+- Manual smoke: click Archon tab, see Archon UI load.
+- Run an Archon workflow from the embedded UI.
+
+---
+
+## Phase 14: Graphiti Visualization
+
+Goal: Build a visualization UI that lets you see the same knowledge graph the
+agents already query. Graphiti (https://github.com/getzep/graphiti) is the
+temporal context graph framework running on Neo4j - this phase adds a UI to
+visualize what's in that graph (replaces Phase 12 scope).
+
+### Why
+
+Agents already use Graphiti to store and query their temporal knowledge graph
+(entities, facts, episodes). This UI lets you see what they see - inspect
+entities, browse relationships, view fact validity windows, trace provenance.
+
+### Graphiti Capabilities (already available to agents)
+
+- **Temporal facts** - validity windows, old facts invalidated not deleted
+- **Episodes & provenance** - every fact traces back to source data
+- **Incremental updates** - real-time graph evolution
+- **Hybrid retrieval** - semantic + keyword + graph traversal
+
+### Work
+
+**Frontend:**
+
+- Add `graphiti` view to Layout.tsx
+- Create `Graphiti.tsx` screen
+- Build graph visualization (D3/force-graph or similar)
+- Query Graphiti data via Hermes IPC
+- Show entities, relationships, temporal validity, provenance
+
+### Dependencies
+
+- Neo4j + Graphiti running in Hermes backend
+- Phase 8 (Personal Memory Bridge) for meaningful data to visualize
