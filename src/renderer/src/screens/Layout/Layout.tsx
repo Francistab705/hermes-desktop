@@ -48,10 +48,7 @@ import {
   Download,
   PanelLeftClose,
   PanelLeftOpen,
-  ChatBubble,
-  ChevronDown,
-  ChevronRight,
-  Wrench,
+  Plus,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
@@ -71,13 +68,12 @@ type View =
   | "kanban"
   | "gateway";
 
-const NAV_ITEMS: {
+const PINNED_NAV_ITEMS: {
   view: View;
   icon: LucideIcon;
   labelKey?: string;
   label?: string;
 }[] = [
-  { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
   { view: "discover", icon: Compass, labelKey: "navigation.discover" },
   // "agents" (Profiles) is reached from the sidebar-footer ProfileSwitcher's
   // "Manage profiles" action rather than a top-level nav item.
@@ -85,8 +81,6 @@ const NAV_ITEMS: {
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
-  { view: "memory", icon: Brain, labelKey: "navigation.memory" },
-  { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
   { view: "workshop", icon: Workflow, label: "Workshop" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
 ];
@@ -739,57 +733,20 @@ function Layout({
           </button>
         </div>
 
-        <nav className="sidebar-nav">
-          {NAV_ITEMS.map(({ view: v, icon: Icon, labelKey, label }) => {
-            const displayLabel = labelKey ? t(labelKey) : label ?? v;
-            if (v === "chat") {
-              // The recent-sessions list lives under the Chat item (the
-              // standalone Sessions view was removed — the full list now opens
-              // in a modal via "Show more").
-              const recentToggleLabel = sessionsExpanded
-                ? t("navigation.hideRecentSessions")
-                : t("navigation.showRecentSessions");
-              return (
-                <div key={v} className="sidebar-nav-sessions">
-                  <div className="sidebar-nav-row">
-                    <button
-                      className={`sidebar-nav-item ${view === v ? "active" : ""}`}
-                      onClick={() => goTo(v)}
-                      title={displayLabel}
-                      aria-label={displayLabel}
-                    >
-                      <Icon size={16} />
-                      <span className="sidebar-nav-label">{displayLabel}</span>
-                    </button>
-                    {!sidebarCollapsed && (
-                      <button
-                        className="sidebar-nav-chevron"
-                        type="button"
-                        onClick={toggleSessionsExpanded}
-                        title={recentToggleLabel}
-                        aria-label={recentToggleLabel}
-                        aria-expanded={sessionsExpanded}
-                      >
-                        {sessionsExpanded ? (
-                          <ChevronDown size={14} />
-                        ) : (
-                          <ChevronRight size={14} />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                  <SidebarRecentSessions
-                    open={sessionsExpanded && !sidebarCollapsed}
-                    activeProfile={activeProfile}
-                    currentSessionId={currentSessionId}
-                    loadingSessionIds={loadingSessionIds}
-                    resumingSessionId={resumingSessionId}
-                    onSelect={handleResumeSession}
-                    onShowMore={() => setSessionsModalOpen(true)}
-                  />
-                </div>
-              );
-            }
+        <nav className="sidebar-nav sidebar-nav-pinned">
+          <button
+            className={`sidebar-nav-item sidebar-new-chat ${
+              view === "chat" && currentSessionId === null ? "active" : ""
+            }`}
+            onClick={handleNewChat}
+            title={t("navigation.newChat")}
+            aria-label={t("navigation.newChat")}
+          >
+            <Plus size={16} />
+            <span className="sidebar-nav-label">{t("navigation.newChat")}</span>
+          </button>
+          {PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey, label }) => {
+            const displayLabel = labelKey ? t(labelKey) : (label ?? v);
             return (
               <button
                 key={v}
