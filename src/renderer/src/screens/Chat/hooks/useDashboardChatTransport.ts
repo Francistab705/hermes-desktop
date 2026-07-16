@@ -11,6 +11,7 @@ import {
 } from "../dashboardEventAdapter";
 import { DashboardGatewayClient } from "../dashboardGatewayClient";
 import { executeSlash, type SlashExecOutcome } from "../slashExec";
+import type { AgentCommandsCatalogResponse } from "../slash/types";
 import type { ActiveTurn, Attachment, ChatMessage, UsageState } from "../types";
 import type { DesktopSessionContinuationItem } from "../../../../../shared/session-continuation";
 
@@ -114,6 +115,7 @@ interface UseDashboardChatTransportResult {
     command: string,
     sys: (text: string) => void,
   ) => Promise<SlashExecOutcome>;
+  getCommandCatalog: () => Promise<AgentCommandsCatalogResponse>;
   /**
    * Launch a background (`/btw`, `/bg`, `/background`) prompt via the gateway's
    * `prompt.background` RPC. It runs a separate agent concurrently with the
@@ -178,12 +180,22 @@ export async function submitDashboardPromptWithRecovery(
     sessionId: string;
     storedSessionId?: string | null;
     text: string;
+    /** Scopes the turn to this profile on the UNIFIED machine dashboard. Without
+     *  it, prompt.submit runs in the dashboard's launch profile (default), so a
+     *  named profile's chat would answer as `default`. session create/resume
+     *  already pass it; prompt.submit must too. */
+    profile?: string;
   },
 ): Promise<string> {
+  const profileParam =
+    params.profile && params.profile !== "default"
+      ? { profile: params.profile }
+      : {};
   try {
     await client.request("prompt.submit", {
       session_id: params.sessionId,
       text: params.text,
+      ...profileParam,
     });
     return params.sessionId;
   } catch (err) {
@@ -193,6 +205,7 @@ export async function submitDashboardPromptWithRecovery(
 
     const resumed = await client.request<SessionResponse>("session.resume", {
       session_id: params.storedSessionId,
+      ...profileParam,
     });
     const recoveredSessionId = resumed?.session_id;
     if (!recoveredSessionId) {
@@ -203,6 +216,7 @@ export async function submitDashboardPromptWithRecovery(
     await client.request("prompt.submit", {
       session_id: recoveredSessionId,
       text: params.text,
+      ...profileParam,
     });
     return recoveredSessionId;
   }
@@ -614,22 +628,95 @@ function logDashboardEvent(
   console.info("[Hermes dashboard event]", summary);
 }
 
-function usageFromPayload(payload: unknown): Partial<UsageState> | null {
+export function usageFromPayload(payload: unknown): Partial<UsageState> | null {
   const usage = asRecord(asRecord(payload).usage);
-  const promptTokens = Number(usage.prompt_tokens ?? usage.promptTokens ?? 0);
+  // The Hermes gateway (`_get_usage` in tui_gateway/server.py) emits
+  // snake-case, non-`_tokens` keys: input/output/prompt/completion/total plus
+  // context_used/context_max/context_percent when the context compressor is
+  // active. Older OpenAI-style payloads use prompt_tokens/promptTokens. Read
+  // every spelling so the context gauge works regardless of which backend/
+  // provider produced the usage record — no chars/4 estimate needed because
+  // the gateway already reports exact counts.
+  const promptTokens = Number(
+    usage.input ??
+      usage.prompt ??
+      usage.prompt_tokens ??
+      usage.promptTokens ??
+      0,
+  );
   const completionTokens = Number(
-    usage.completion_tokens ?? usage.completionTokens ?? 0,
+    usage.output ??
+      usage.completion ??
+      usage.completion_tokens ??
+      usage.completionTokens ??
+      0,
   );
   const totalTokens = Number(
-    usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens,
+    usage.total ??
+      usage.total_tokens ??
+      usage.totalTokens ??
+      promptTokens + completionTokens,
   );
-  if (!promptTokens && !completionTokens && !totalTokens) return null;
+  // context_used = the current turn's prompt-token occupancy of the context
+  // window (compressor's last_prompt_tokens), which is exactly what the gauge
+  // wants — a live snapshot, not a cross-turn sum. Fall back to the latest
+  // prompt count when the compressor hasn't reported yet.
+  const contextUsed = Number(usage.context_used ?? 0);
+  const contextMax = Number(usage.context_max ?? 0);
+  if (!promptTokens && !completionTokens && !totalTokens && !contextUsed) {
+    return null;
+  }
   return {
     promptTokens,
     completionTokens,
     totalTokens,
-    contextTokens: promptTokens || undefined,
+    contextTokens: contextUsed || promptTokens || undefined,
+    contextWindowTokens: contextMax || undefined,
   };
+}
+
+function messageChars(message: ChatMessage): number {
+  if ("content" in message) return message.content?.length ?? 0;
+  switch (message.kind) {
+    case "reasoning":
+      return message.text.length;
+    case "tool_call":
+      return message.name.length + message.args.length;
+    case "clarify":
+      return message.question.length;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Rough context-occupancy estimate (~4 chars/token) from the transcript, used
+ * as a last resort when the provider omits usage counts so the context gauge
+ * still renders (it only shows when `contextTokens` is set — see Chat.tsx).
+ *
+ * `contextTokens` means the turn's PROMPT-side occupancy, and by the time
+ * `message.complete` is handled the just-finished assistant reply has already
+ * been reconciled into `messagesRef.current` — so the last assistant bubble
+ * (specifically the bubble, not trailing tool/reasoning sub-rows, which were
+ * part of the prompt loop) is subtracted back out.
+ *
+ * Inherently a floor: system prompt, tool schemas, and attachments aren't
+ * visible to the renderer.
+ */
+export function estimateContextTokens(
+  messages: ReadonlyArray<ChatMessage>,
+): number {
+  let totalChars = 0;
+  let lastAssistantBubbleChars = 0;
+  for (const message of messages) {
+    const chars = messageChars(message);
+    totalChars += chars;
+    const isBubble = message.kind === undefined || message.kind === "assistant";
+    if (message.role === "agent" && isBubble) {
+      lastAssistantBubbleChars = chars;
+    }
+  }
+  return Math.max(Math.round((totalChars - lastAssistantBubbleChars) / 4), 0);
 }
 
 export function completionFailed(payload: unknown): boolean {
@@ -835,9 +922,23 @@ export function useDashboardChatTransport({
   const pendingRecoveredContinuationRef = useRef<
     DesktopSessionContinuationItem[]
   >([]);
+  const lastSyncedCwdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    messagesRef.current = messages;
+    // `messagesRef` is the synchronous source of truth for `handleGatewayEvent`:
+    // it reads the ref, applies a stream delta, writes the ref back, then calls
+    // `setMessages`. Every `setMessages` in this hook stores that exact array in
+    // the ref, so when React finally commits our own push, `messages` is the
+    // very same reference and there is nothing to do. Re-syncing on that commit
+    // is what dropped streaming chunks (#757): a second delta could land on an
+    // older `messages` snapshot and reset the ref behind the deltas already
+    // applied. Skip when the identity matches (our push); adopt any other array,
+    // which can only come from Chat state changing underneath us — a new user
+    // turn (grows), `handleClear` (`setMessages([])`, shrinks), or a clarify
+    // card resolving in place (same length). A length check misses the last two.
+    if (messages !== messagesRef.current) {
+      messagesRef.current = messages;
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -849,6 +950,7 @@ export function useDashboardChatTransport({
     recreateRuntimeSessionRef.current = false;
     lastRuntimeSessionWasCreatedRef.current = false;
     pendingClarifyRequestIdRef.current = null;
+    lastSyncedCwdRef.current = null;
   }, [hermesSessionId]);
 
   useEffect(() => {
@@ -868,6 +970,7 @@ export function useDashboardChatTransport({
     lastRuntimeSessionWasCreatedRef.current = false;
     pendingClarifyRequestIdRef.current = null;
     pendingRecoveredContinuationRef.current = [];
+    lastSyncedCwdRef.current = null;
   }, [connectionMode, profile]);
 
   const handleGatewayEvent = useCallback(
@@ -915,7 +1018,10 @@ export function useDashboardChatTransport({
           reasoningSegmentClosed: reasoningSegmentClosedRef.current,
         },
         event,
-        { activeTurn: activeTurnRef.current },
+        {
+          activeTurn: activeTurnRef.current,
+          renderAssistantDeltas: connectionMode === "local",
+        },
       );
       reasoningSegmentClosedRef.current = next.reasoningSegmentClosed;
       const nextMessages = failed
@@ -956,14 +1062,29 @@ export function useDashboardChatTransport({
         setToolProgress(null);
         setIsLoading(false);
         const usage = usageFromPayload(event.payload);
-        if (usage) {
+        if (usage || !failed) {
+          // The gauge only renders when `contextTokens` is set, so it must be
+          // populated even when the provider omits usage — entirely
+          // (usageFromPayload → null) or just the prompt-side counts. Exact
+          // payload values win; otherwise fall back to the chars/4 transcript
+          // estimate, then to the previous turn's value. A failed turn with no
+          // usage doesn't fabricate one — nothing new entered the context.
+          const estimatedContextTokens = estimateContextTokens(
+            messagesRef.current,
+          );
           setUsage((prev) => ({
-            promptTokens: (prev?.promptTokens || 0) + (usage.promptTokens || 0),
+            promptTokens:
+              (prev?.promptTokens || 0) + (usage?.promptTokens || 0),
             completionTokens:
-              (prev?.completionTokens || 0) + (usage.completionTokens || 0),
-            totalTokens: (prev?.totalTokens || 0) + (usage.totalTokens || 0),
+              (prev?.completionTokens || 0) + (usage?.completionTokens || 0),
+            totalTokens: (prev?.totalTokens || 0) + (usage?.totalTokens || 0),
             cost: prev?.cost,
-            contextTokens: usage.contextTokens || prev?.contextTokens,
+            contextTokens:
+              usage?.contextTokens ||
+              estimatedContextTokens ||
+              prev?.contextTokens,
+            contextWindowTokens:
+              usage?.contextWindowTokens || prev?.contextWindowTokens,
             cacheReadTokens: prev?.cacheReadTokens,
             cacheWriteTokens: prev?.cacheWriteTokens,
           }));
@@ -1008,45 +1129,88 @@ export function useDashboardChatTransport({
 
       const generation = clientGenerationRef.current;
       const pending = (async () => {
-        const status = await window.hermesAPI.startDashboard(profile);
-        if (clientGenerationRef.current !== generation) {
-          throw new Error("Hermes dashboard connection was superseded");
-        }
-        if (!status.running || !status.connection?.wsUrl) {
-          // Sticky-fallback + notify only when we're actually going to fall back
-          // to legacy (auto mode). With an explicit "dashboard" preference
-          // (fallbackOnUnavailable=false) the turn errors instead, so latching or
-          // claiming "using basic chat" would be wrong. Local stays retryable —
-          // its dashboard may still be spawning.
-          if (
-            connectionMode !== "local" &&
-            fallbackOnUnavailable &&
-            !dashboardUnavailableRef.current
-          ) {
-            dashboardUnavailableRef.current = true;
-            onDashboardUnavailable?.(
+        // The dashboard `/api/ws` is the ONLY chat transport when a dashboard is
+        // available (matching apps/desktop, which has no /v1 chat path). A WS
+        // drop / "socket hang up" — e.g. a momentary SSH tunnel blip — is
+        // TRANSIENT and must reconnect, NOT fall back to the main-process /v1
+        // path: over the dashboard tunnel /v1 doesn't exist and 405s. So retry
+        // the connect (re-running startDashboard each attempt to re-establish the
+        // tunnel). Only a genuinely-absent dashboard (running=false) latches the
+        // negative flag and lets the caller drop to legacy gateway /v1.
+        let lastConnectErr: unknown = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const status = await window.hermesAPI.startDashboard(profile);
+          if (clientGenerationRef.current !== generation) {
+            throw new Error("Hermes dashboard connection was superseded");
+          }
+          if (!status.running || !status.connection) {
+            if (status.needsOAuthLogin) {
+              const error = new Error(
+                status.error || "Remote gateway sign-in is required",
+              ) as Error & { dashboardWasReachable?: boolean };
+              error.dashboardWasReachable = true;
+              throw error;
+            }
+            // No dashboard on this remote (gateway-only install). Latch + notify
+            // only in auto mode where we actually fall back to legacy.
+            if (
+              connectionMode !== "local" &&
+              fallbackOnUnavailable &&
+              !dashboardUnavailableRef.current
+            ) {
+              dashboardUnavailableRef.current = true;
+              onDashboardUnavailable?.(
+                status.error || "Hermes dashboard transport is unavailable",
+              );
+            }
+            throw new Error(
               status.error || "Hermes dashboard transport is unavailable",
             );
           }
-          throw new Error(
-            status.error || "Hermes dashboard transport is unavailable",
-          );
-        }
-        const client: DashboardGatewayClient = new DashboardGatewayClient({
-          onEvent: handleGatewayEvent,
-          onClose: () => {
-            if (clientRef.current === client) {
-              clientRef.current = null;
+          const client: DashboardGatewayClient = new DashboardGatewayClient({
+            onEvent: handleGatewayEvent,
+            onClose: () => {
+              if (clientRef.current === client) {
+                clientRef.current = null;
+              }
+            },
+          });
+          try {
+            const freshUrl = window.hermesAPI.freshDashboardWsUrl
+              ? await window.hermesAPI.freshDashboardWsUrl(profile)
+              : status.connection.wsUrl;
+            if (!freshUrl) {
+              throw new Error("Hermes dashboard WebSocket URL is unavailable");
             }
-          },
-        });
-        await client.connect(status.connection.wsUrl);
-        if (clientGenerationRef.current !== generation) {
-          client.close();
-          throw new Error("Hermes dashboard connection was superseded");
+            await client.connect(freshUrl);
+          } catch (err) {
+            lastConnectErr = err;
+            client.close();
+            if (clientGenerationRef.current !== generation) {
+              throw new Error("Hermes dashboard connection was superseded");
+            }
+            // Transient connect failure while the dashboard IS up — back off and
+            // retry (the tunnel may be re-establishing).
+            await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+            continue;
+          }
+          if (clientGenerationRef.current !== generation) {
+            client.close();
+            throw new Error("Hermes dashboard connection was superseded");
+          }
+          clientRef.current = client;
+          return client;
         }
-        clientRef.current = client;
-        return client;
+        // Dashboard was up but the WS wouldn't stay connected. Tag the error so
+        // the caller fails the turn (and lets the user retry) instead of POSTing
+        // /v1 to the dashboard tunnel (which 405s).
+        const err = new Error(
+          lastConnectErr instanceof Error
+            ? `Hermes dashboard chat connection failed: ${lastConnectErr.message}`
+            : "Hermes dashboard chat connection failed",
+        ) as Error & { dashboardWasReachable?: boolean };
+        err.dashboardWasReachable = true;
+        throw err;
       })();
       connectingRef.current = pending;
 
@@ -1073,38 +1237,61 @@ export function useDashboardChatTransport({
         forceCreate?: boolean;
       } = {},
     ): Promise<string> => {
-      if (runtimeSessionIdRef.current) {
-        lastRuntimeSessionWasCreatedRef.current = false;
-        return runtimeSessionIdRef.current;
+      let targetSessionId = runtimeSessionIdRef.current;
+      let justCreated = false;
+
+      if (!targetSessionId) {
+        const stored = storedSessionIdRef.current;
+        const excludeSeedUserId =
+          options.excludeSeedUserId ?? activeTurnRef.current?.userId ?? null;
+        const response = await ensureDashboardRuntimeSession({
+          client,
+          contextFolder,
+          excludeSeedUserId,
+          forceCreate: options.forceCreate ?? false,
+          messages: messagesRef.current,
+          profile,
+          storedSessionId: stored,
+        });
+
+        if (stored && response.created) {
+          pendingRecoveredContinuationRef.current =
+            dashboardContinuationItemsFromTranscript(messagesRef.current, {
+              excludeUserId: excludeSeedUserId,
+            });
+        }
+
+        targetSessionId = response.runtimeSessionId;
+        runtimeSessionIdRef.current = targetSessionId;
+        lastRuntimeSessionWasCreatedRef.current = response.created;
+        justCreated = response.created;
+        if (justCreated && contextFolder) {
+          lastSyncedCwdRef.current = contextFolder;
+        }
+        const storedId = response.storedSessionId;
+        storedSessionIdRef.current = storedId;
+        recreateRuntimeSessionRef.current = false;
+        setHermesSessionId(storedId);
       }
 
-      const stored = storedSessionIdRef.current;
-      const excludeSeedUserId =
-        options.excludeSeedUserId ?? activeTurnRef.current?.userId ?? null;
-      const response = await ensureDashboardRuntimeSession({
-        client,
-        contextFolder,
-        excludeSeedUserId,
-        forceCreate: options.forceCreate ?? false,
-        messages: messagesRef.current,
-        profile,
-        storedSessionId: stored,
-      });
-
-      if (stored && response.created) {
-        pendingRecoveredContinuationRef.current =
-          dashboardContinuationItemsFromTranscript(messagesRef.current, {
-            excludeUserId: excludeSeedUserId,
+      if (
+        contextFolder &&
+        targetSessionId &&
+        lastSyncedCwdRef.current !== contextFolder
+      ) {
+        lastSyncedCwdRef.current = contextFolder;
+        await client
+          .request("session.cwd.set", {
+            session_id: targetSessionId,
+            cwd: contextFolder,
+          })
+          .catch((err) => {
+            lastSyncedCwdRef.current = null;
+            console.warn("Failed to sync dashboard CWD:", err);
           });
       }
 
-      runtimeSessionIdRef.current = response.runtimeSessionId;
-      lastRuntimeSessionWasCreatedRef.current = response.created;
-      const storedId = response.storedSessionId;
-      storedSessionIdRef.current = storedId;
-      recreateRuntimeSessionRef.current = false;
-      setHermesSessionId(storedId);
-      return response.runtimeSessionId;
+      return targetSessionId;
     },
     [activeTurnRef, contextFolder, profile, setHermesSessionId],
   );
@@ -1351,6 +1538,15 @@ export function useDashboardChatTransport({
       try {
         client = await ensureClient();
       } catch (err) {
+        // Dashboard was reachable but the chat WS wouldn't connect: do NOT fall
+        // back to the /v1 path — over the dashboard tunnel /v1 doesn't exist and
+        // 405s. Surface the error so the user retries on the same transport.
+        if (
+          (err as { dashboardWasReachable?: boolean })?.dashboardWasReachable
+        ) {
+          const message = err instanceof Error ? err.message : String(err);
+          return failActiveTurn(message);
+        }
         if (fallbackOnUnavailable) {
           console.warn("Falling back to legacy chat transport.", err);
           return false;
@@ -1414,6 +1610,7 @@ export function useDashboardChatTransport({
           sessionId: selectedSessionId,
           storedSessionId: storedSessionIdRef.current,
           text: submitText,
+          profile,
           onRecoveredSessionId: (recoveredSessionId) => {
             runtimeSessionIdRef.current = recoveredSessionId;
           },
@@ -1438,6 +1635,7 @@ export function useDashboardChatTransport({
       setIsLoading,
       setMessages,
       setToolProgress,
+      profile,
     ],
   );
 
@@ -1469,6 +1667,18 @@ export function useDashboardChatTransport({
     [enabled, ensureClient, ensureRuntimeSession, ensureSelectedModel],
   );
 
+  const getCommandCatalog =
+    useCallback(async (): Promise<AgentCommandsCatalogResponse> => {
+      if (!enabled) {
+        throw new Error("dashboard transport disabled");
+      }
+      const client = await ensureClient();
+      return client.request<AgentCommandsCatalogResponse>(
+        "commands.catalog",
+        {},
+      );
+    }, [enabled, ensureClient]);
+
   const runBackground = useCallback(
     async (text: string): Promise<{ taskId?: string; error?: string }> => {
       if (!enabled) return { error: "dashboard transport disabled" };
@@ -1478,7 +1688,11 @@ export function useDashboardChatTransport({
         const sessionId = await ensureSelectedModel(client, runtimeSessionId);
         const r = await client.request<{ task_id?: string }>(
           "prompt.background",
-          { session_id: sessionId, text },
+          {
+            session_id: sessionId,
+            text,
+            ...(profile && profile !== "default" ? { profile } : {}),
+          },
         );
         return { taskId: r?.task_id };
       } catch (err) {
@@ -1487,7 +1701,7 @@ export function useDashboardChatTransport({
         };
       }
     },
-    [enabled, ensureClient, ensureRuntimeSession, ensureSelectedModel],
+    [enabled, ensureClient, ensureRuntimeSession, ensureSelectedModel, profile],
   );
 
   const abort = useCallback(() => {
@@ -1509,5 +1723,12 @@ export function useDashboardChatTransport({
     [],
   );
 
-  return { abort, enabled, sendMessage, execSlash, runBackground };
+  return {
+    abort,
+    enabled,
+    sendMessage,
+    execSlash,
+    getCommandCatalog,
+    runBackground,
+  };
 }

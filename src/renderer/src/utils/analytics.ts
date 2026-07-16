@@ -29,6 +29,8 @@ export function setAnalyticsConsent(enabled: boolean): void {
   void enabled;
 }
 
+// Rotate the per-install identifier (e.g. on explicit user reset). A fresh id
+// is created lazily on the next capture().
 export function resetAnalytics(): void {
   // No-op: analytics is disabled.
 }

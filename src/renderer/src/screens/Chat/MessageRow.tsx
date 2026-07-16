@@ -1,6 +1,9 @@
 import { memo, useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { formatDistanceToNowStrict } from "date-fns";
+import { Grid } from "react-loader-spinner";
 import { Copy, Check } from "lucide-react";
 import loadingGif from "../../assets/loadingo.gif";
+import ProfileAvatar from "../../components/common/ProfileAvatar";
 import { AgentMarkdown } from "../../components/AgentMarkdown";
 import { AttachmentChip } from "../../components/AttachmentChip";
 import { MediaSegmentView } from "../../components/MediaImage";
@@ -10,6 +13,73 @@ import type { ChatBubbleMessage, ChatMessage } from "./types";
 
 export const APPROVAL_RE =
   /⚠️.*dangerous|requires? (your )?approval|\/approve.*\/deny|do you want (me )?to (proceed|continue|run|execute)/i;
+
+/**
+ * Coerce any DB, stream, or IPC timestamp value to valid epoch milliseconds.
+ * Handles seconds (< 1e12), ms, us (> 1e14), ns (> 1e17), and ISO strings.
+ */
+const MS_THRESHOLD = 1e12;
+const US_THRESHOLD = 1e14;
+const NS_THRESHOLD = 1e17;
+
+function coerceToEpochMs(raw: unknown): number {
+  if (typeof raw === "number") {
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    if (raw < MS_THRESHOLD) return raw * 1000;
+    if (raw < US_THRESHOLD) return raw;
+    if (raw < NS_THRESHOLD) return Math.floor(raw / 1000);
+    return Math.floor(raw / 1_000_000);
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return 0;
+    const num = Number(trimmed);
+    if (Number.isFinite(num) && num > 0) {
+      return coerceToEpochMs(num);
+    }
+    const parsed = new Date(trimmed).getTime();
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 0;
+}
+
+// Earliest valid chat timestamp: Jan 1 2020 (1577836800000 ms).
+// Anything before 2020 (e.g. 0, 1 => Jan 1970 => "57 years ago") is bogus/dummy.
+const MIN_VALID_EPOCH_MS = 1_577_836_800_000;
+
+function isValidEpochMs(ms: number): boolean {
+  return (
+    Number.isFinite(ms) &&
+    ms >= MIN_VALID_EPOCH_MS &&
+    !isNaN(new Date(ms).getTime())
+  );
+}
+
+/**
+ * Relative "time ago" label for the hover-time element.
+ */
+function formatBubbleTime(ms: number): string | null {
+  try {
+    if (Date.now() - ms < 10_000 && Date.now() >= ms) return "just now";
+    return formatDistanceToNowStrict(ms, { addSuffix: true });
+  } catch {
+    return null;
+  }
+}
+
+/** Absolute timestamp for the tooltip and `<time dateTime>` value. */
+function formatBubbleTimeAbsolute(ms: number): string {
+  try {
+    return new Date(ms).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return "";
+  }
+}
 
 function isChatBubbleMessage(msg: ChatMessage): msg is ChatBubbleMessage {
   return (
@@ -26,53 +96,34 @@ function isChatBubbleMessage(msg: ChatMessage): msg is ChatBubbleMessage {
  */
 const GIF_LOOP_MS = 4760;
 
-/**
- * Captures the gif's first frame as a static PNG data URL, once, shared across
- * every avatar instance. Idle avatars (past turns) render this frozen frame so
- * the chat isn't full of perpetually-spinning gifs — only the in-flight turn's
- * avatar runs the live animation.
- */
-let frozenFramePromise: Promise<string> | null = null;
-function getFrozenFrame(): Promise<string> {
-  if (!frozenFramePromise) {
-    frozenFramePromise = new Promise<string>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) return reject(new Error("no 2d context"));
-          // drawImage right after load captures frame 0 (not yet advanced).
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/png"));
-        } catch (err) {
-          reject(err as Error);
-        }
-      };
-      img.onerror = () => reject(new Error("failed to load loadingo.gif"));
-      img.src = loadingGif;
-    });
-  }
-  return frozenFramePromise;
+/** Appearance of the agent whose turn a row belongs to, used to render its
+ *  profile avatar while idle. Name drives the letter/logo + default colour. */
+export interface AgentAvatarInfo {
+  name: string;
+  color?: string | null;
+  avatar?: string | null;
 }
 
 /**
  * Agent avatar. While `active` (the turn is generating) it plays the looping
  * `loadingo.gif`. When `active` goes false it doesn't freeze instantly — it
- * keeps animating until the end of the current loop, then swaps to a static
- * frozen frame so the stop lands on a clean loop boundary.
+ * keeps animating until the end of the current loop, then swaps to the agent's
+ * profile avatar so idle turns are identified by who produced them (and the
+ * chat isn't full of perpetually-spinning gifs). The swap lands on a clean loop
+ * boundary rather than mid-frame.
  */
 export const HermesAvatar = memo(function HermesAvatar({
   size = 30,
   active = false,
+  agent,
 }: {
   size?: number;
   /** True only for the avatar of the turn currently being generated. */
   active?: boolean;
+  /** The agent whose profile avatar shows once the turn is idle. When absent
+   *  (e.g. the live typing indicator) the loading gif is used as the fallback. */
+  agent?: AgentAvatarInfo;
 }): React.JSX.Element {
-  const [frozenSrc, setFrozenSrc] = useState<string | null>(null);
   const [playing, setPlaying] = useState(active);
   // Re-keying the <img> on each play session restarts the gif from frame 0 so
   // the loop clock below is accurate.
@@ -83,20 +134,6 @@ export const HermesAvatar = memo(function HermesAvatar({
   const stopTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    getFrozenFrame()
-      .then((src) => {
-        if (!cancelled) setFrozenSrc(src);
-      })
-      .catch(() => {
-        /* fall back to the live gif if the snapshot can't be built */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (active) {
@@ -111,7 +148,8 @@ export const HermesAvatar = memo(function HermesAvatar({
         playStartRef.current = performance.now();
       }
     } else if (playing) {
-      // Generation stopped: run out the rest of the current loop, then freeze.
+      // Generation stopped: run out the rest of the current loop, then swap to
+      // the profile avatar.
       const elapsed = (performance.now() - playStartRef.current) % GIF_LOOP_MS;
       const remaining = GIF_LOOP_MS - elapsed;
       if (stopTimer.current) clearTimeout(stopTimer.current);
@@ -122,12 +160,21 @@ export const HermesAvatar = memo(function HermesAvatar({
     };
   }, [active, playing]);
 
+  // Idle with no known agent (e.g. the typing indicator before any turn) still
+  // falls back to the gif's first frame rather than a blank/"?" avatar.
+  const showGif = playing || !agent;
+
   return (
     <div className="chat-avatar chat-avatar-agent">
-      {playing ? (
+      {showGif ? (
         <img key={playKey} src={loadingGif} width={size} height={size} alt="" />
       ) : (
-        <img src={frozenSrc ?? loadingGif} width={size} height={size} alt="" />
+        <ProfileAvatar
+          name={agent.name}
+          color={agent.color}
+          avatar={agent.avatar}
+          size={size}
+        />
       )}
     </div>
   );
@@ -156,6 +203,8 @@ interface MessageRowProps {
   /** False on continuation rows of a turn — render a spacer instead of the
    *  avatar so the turn reads as one grouped block. Defaults to true. */
   showAvatar?: boolean;
+  /** Appearance of the chatting agent, shown once the avatar goes idle. */
+  agent?: AgentAvatarInfo;
 }
 
 export const MessageRow = memo(function MessageRow({
@@ -167,6 +216,7 @@ export const MessageRow = memo(function MessageRow({
   onSendMessage: _onSendMessage,
   onPinArtifact: _onPinArtifact,
   showAvatar = true,
+  agent,
 }: MessageRowProps): React.JSX.Element {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -207,7 +257,7 @@ export const MessageRow = memo(function MessageRow({
     return (
       <div className={`chat-message chat-message-${msg.role}`}>
         {showAvatar ? (
-          <HermesAvatar active={isLoading && isLast} />
+          <HermesAvatar active={isLoading && isLast} agent={agent} />
         ) : (
           <AvatarSpacer />
         )}
@@ -225,6 +275,9 @@ export const MessageRow = memo(function MessageRow({
     isLast &&
     APPROVAL_RE.test(msg.content);
   const hasAttachments = !!msg.attachments && msg.attachments.length > 0;
+  const epochMs = coerceToEpochMs(msg.timestamp);
+  const isTimeValid = isValidEpochMs(epochMs);
+  const bubbleTime = isTimeValid ? formatBubbleTime(epochMs) : null;
 
   return (
     <div
@@ -237,14 +290,14 @@ export const MessageRow = memo(function MessageRow({
       {msg.role === "user" ? null : !showAvatar ? (
         <AvatarSpacer />
       ) : (
-        <HermesAvatar active={isLoading && isLast} />
+        <HermesAvatar active={isLoading && isLast} agent={agent} />
       )}
       <div
         className={`chat-bubble chat-bubble-${msg.role}${
           msg.error ? " chat-bubble-error" : ""
         }`}
       >
-        {msg.content && !isLoading && (
+        {msg.content && !isLoading && !msg.isSlashLoader && (
           <div className="chat-bubble-actions">
             <button
               type="button"
@@ -264,7 +317,20 @@ export const MessageRow = memo(function MessageRow({
             ))}
           </div>
         )}
-        {msg.content &&
+        {msg.isSlashLoader ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Grid
+              visible={true}
+              height={13}
+              width={13}
+              radius={15}
+              color="#8b7cf6"
+              ariaLabel="running-command"
+            />
+            <span>{msg.content}</span>
+          </div>
+        ) : (
+          msg.content &&
           (msg.role === "agent" && segments
             ? segments.map((segment) =>
                 segment.type === "text" ? (
@@ -287,13 +353,23 @@ export const MessageRow = memo(function MessageRow({
                   />
                 ),
               )
-            : msg.content)}
+            : msg.content)
+        )}
         {msg.error && (
           <div className="chat-error-message" role="alert">
             {msg.error}
           </div>
         )}
       </div>
+      {bubbleTime && isTimeValid && (
+        <time
+          className="chat-bubble-time"
+          dateTime={new Date(epochMs).toISOString()}
+          title={formatBubbleTimeAbsolute(epochMs)}
+        >
+          {bubbleTime}
+        </time>
+      )}
       {showApprovalBar && (
         <div className="chat-approval-bar">
           <button

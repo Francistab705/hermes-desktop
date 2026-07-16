@@ -6,6 +6,21 @@ export default {
     privacy: "隐私",
     credentialPool: "凭据池",
   },
+  nav: {
+    groups: {
+      general: "通用",
+      hermes: "Hermes One",
+    },
+    appearance: "外观",
+    language: "语言",
+    privacy: "隐私",
+    connection: "连接",
+    network: "网络",
+    data: "数据",
+    about: "关于与更新",
+    community: "社区",
+    logs: "日志与诊断",
+  },
   analytics: {
     label: "发送匿名使用情况分析",
     hint: "Analytics are disabled in the SBC Tech fork.",

@@ -6,6 +6,32 @@ export default {
     privacy: "Privacy",
     credentialPool: "Credential Pool",
   },
+  nav: {
+    groups: {
+      general: "General",
+      hermes: "Hermes One",
+    },
+    appearance: "Appearance",
+    language: "Language",
+    privacy: "Privacy",
+    connection: "Connection",
+    network: "Network",
+    data: "Data",
+    about: "About & Updates",
+    community: "Community",
+    logs: "Logs & Diagnostics",
+  },
+  agentSubtitle: "The local AI engine",
+  desktopTitle: "Hermes One Desktop",
+  desktopSubtitle: "This desktop app",
+  statusUpToDate: "Up to date",
+  statusUpdateAvailable: "Update available",
+  statusUpdateReady: "Update ready",
+  checkForUpdates: "Check for updates",
+  checkingUpdates: "Checking…",
+  downloadUpdate: "Download update",
+  retry: "Retry",
+  onLatestVersion: "You're on the latest version.",
   theme: {
     label: "Theme",
     system: "System",
@@ -21,6 +47,18 @@ export default {
     manrope: "Manrope",
     system: "System",
     hint: "Choose the interface font",
+  },
+  hardwareAcceleration: {
+    label: "Hardware acceleration",
+    auto: "Auto",
+    on: "Always on",
+    off: "Always off",
+    hint: "Auto uses the GPU and falls back to software rendering for 24 hours after a GPU crash. Always on retries the GPU every launch; Always off keeps software rendering (the 3D office will be slow).",
+    envOverride:
+      "Overridden by the HERMES_DISABLE_GPU environment variable — this setting will have no effect until it is removed.",
+    restartToApply: "Takes effect after a restart.",
+    restartNow: "Restart now",
+    saveFailed: "Could not save the preference.",
   },
   language: {
     label: "Language",
@@ -75,6 +113,8 @@ export default {
   discoveryError:
     "Couldn't reach the provider's model list — you can still type a model name",
   customBaseUrlHint: "OpenAI-compatible API endpoint",
+  compatApiKeyHint:
+    "Stored as {{envVar}} — required for remote endpoints, optional for localhost.",
   poolHint:
     "Add multiple API Keys for the same provider for automatic rotation and load balancing. Hermes will cycle through them.",
   add: "Add",
@@ -94,6 +134,9 @@ export default {
   updating: "Updating...",
   updateEngine: "Update Engine",
   latestVersion: "Already up to date",
+  autoUpgradeDesktop: "Auto-upgrade desktop app",
+  autoUpgradeDesktopHint:
+    "Automatically download new Hermes One releases from GitHub when the app starts. Turn this off to show the startup upgrade button without downloading until you click it.",
   runningDiagnosis: "Running diagnosis...",
   runDiagnosis: "Run Diagnosis",
   running: "Running...",
@@ -119,13 +162,28 @@ export default {
   remoteApiKey: "API Key",
   remoteApiKeyHint:
     "Matches API_SERVER_KEY on the remote host. Leave empty if the server accepts unauthenticated requests.",
+  remoteAuthDetecting:
+    "Authentication is detected automatically. Enter a token only for token-based gateways.",
+  remoteOAuthTitle: "Browser authentication",
+  remoteOAuthHint:
+    "This gateway uses OAuth. Sign in in the secure browser window to continue.",
+  remoteOAuthConnected: "Signed in to the remote gateway.",
+  remoteOAuthSignIn: "Sign in with browser",
+  remoteOAuthSignOut: "Sign out",
+  remoteOAuthWorking: "Working…",
+  remoteOAuthLoginSuccess: "Remote gateway sign-in complete.",
+  remoteOAuthLoginFailed: "Remote gateway sign-in failed.",
+  remoteOAuthCancelled: "Remote gateway sign-in cancelled.",
+  remoteOAuthLogoutSuccess: "Signed out from the remote gateway.",
+  remoteChatTransportHint:
+    "Auto detects token or OAuth dashboard authentication. OAuth never falls back to the legacy remote API when sign-in is missing or expired.",
   testingConnection: "Testing...",
   testConnection: "Test Connection",
   save: "Save",
   serverConfigTitle: "Server Configuration",
   serverConfigHint:
     "You&apos;re connected to a remote Hermes server. Model selection, provider API keys, and credentials are managed on the server&apos;s <code>~/.hermes/.env</code> and <code>config.yaml</code>. Edit them on the host (e.g. <code>docker exec -it hermes vi /opt/data/.env</code>) and restart the container.",
-  connectionMode: "Mode",
+  connectionMode: "Connection Mode",
   switchedToLocal: "Switched to local mode",
 
   // Community
@@ -133,6 +191,16 @@ export default {
   communityHint:
     "Join our Discord channel to ask questions, report issues, and chat with other Hermes users.",
   joinDiscord: "Join Discord Channel",
+  communityLinksHint:
+    "Connect with the Hermes One community, get help, and stay up to date.",
+  linkWebsite: "Website",
+  linkDiscord: "Discord",
+  linkX: "X",
+  linkTelegram: "Telegram",
+  supportTitle: "Support the developer",
+  supportHint:
+    "Hermes One is free and open source — if it helps you, consider supporting its development.",
+  supportKofi: "Support on Ko-fi",
 
   // SSH & Server Config
   modeSsh: "SSH Tunnel",

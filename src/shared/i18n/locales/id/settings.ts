@@ -6,6 +6,21 @@ export default {
     privacy: "Privasi",
     credentialPool: "Kumpulan Kredensial",
   },
+  nav: {
+    groups: {
+      general: "Umum",
+      hermes: "Hermes One",
+    },
+    appearance: "Tampilan",
+    language: "Bahasa",
+    privacy: "Privasi",
+    connection: "Koneksi",
+    network: "Jaringan",
+    data: "Data",
+    about: "Tentang & Pembaruan",
+    community: "Komunitas",
+    logs: "Log & Diagnostik",
+  },
   analytics: {
     label: "Kirim analitik penggunaan anonim",
     hint: "Analytics are disabled in the SBC Tech fork.",

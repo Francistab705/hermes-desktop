@@ -6,6 +6,21 @@ export default {
     privacy: "Privacidade",
     credentialPool: "Pool de Credenciais",
   },
+  nav: {
+    groups: {
+      general: "Geral",
+      hermes: "Hermes One",
+    },
+    appearance: "Aparência",
+    language: "Idioma",
+    privacy: "Privacidade",
+    connection: "Ligação",
+    network: "Rede",
+    data: "Dados",
+    about: "Acerca e atualizações",
+    community: "Comunidade",
+    logs: "Registos e diagnóstico",
+  },
   analytics: {
     label: "Enviar análises de utilização anónimas",
     hint: "Analytics are disabled in the SBC Tech fork.",

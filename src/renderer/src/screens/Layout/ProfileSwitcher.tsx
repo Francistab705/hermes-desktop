@@ -2,8 +2,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, Settings } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 import ProfileAvatar from "../../components/common/ProfileAvatar";
+import { useProfileModal } from "../../components/profile/ProfileModalContext";
 
 interface ProfileInfo {
+  id: string;
   name: string;
   isDefault: boolean;
   isActive: boolean;
@@ -15,7 +17,7 @@ interface ProfileInfo {
 }
 
 interface ProfileSwitcherProps {
-  /** Name of the currently active profile ("default" for the base workspace). */
+  /** Id of the currently active profile ("default" for the base workspace). */
   activeProfile: string;
   /** Called after a successful switch so the shell can reset chat state. */
   onSwitch: (name: string) => void;
@@ -36,6 +38,7 @@ export default function ProfileSwitcher({
   compact = false,
 }: ProfileSwitcherProps): React.JSX.Element {
   const { t } = useI18n();
+  const { openProfile } = useProfileModal();
   const [open, setOpen] = useState(false);
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -80,9 +83,15 @@ export default function ProfileSwitcher({
     };
   }, [open]);
 
+  const activeInfo = profiles.find((p) => p.id === activeProfile);
+  const hasDefaultFallbackName =
+    activeInfo?.isDefault && activeInfo.name === activeInfo.id;
   const label =
-    activeProfile === "default" ? t("common.appName") : activeProfile;
-  const activeInfo = profiles.find((p) => p.name === activeProfile);
+    activeInfo && !hasDefaultFallbackName
+      ? activeInfo.name
+      : activeProfile === "default"
+        ? t("common.appName")
+        : activeProfile;
 
   async function handleSelect(name: string): Promise<void> {
     setOpen(false);
@@ -103,15 +112,26 @@ export default function ProfileSwitcher({
       {open && (
         <div className="profile-menu" role="menu">
           {(() => {
-            const active = profiles.find((p) => p.name === activeProfile);
-            const others = profiles.filter((p) => p.name !== activeProfile);
+            const active = profiles.find((p) => p.id === activeProfile);
+            const others = profiles.filter((p) => p.id !== activeProfile);
             return (
               <>
                 {active && (
-                  <div className="profile-menu-active-section">
+                  <button
+                    type="button"
+                    className="profile-menu-active-section"
+                    role="menuitem"
+                    title={t("agents.editAppearanceFor", {
+                      name: active.name,
+                    })}
+                    onClick={() => {
+                      setOpen(false);
+                      openProfile(active.id, { onChanged: load });
+                    }}
+                  >
                     <div className="profile-menu-avatar">
                       <ProfileAvatar
-                        name={active.name}
+                        name={active.id}
                         color={active.color}
                         avatar={active.avatar}
                         size={32}
@@ -128,6 +148,9 @@ export default function ProfileSwitcher({
                             {t("agents.defaultTag")}
                           </span>
                         )}
+                        {active.id !== active.name && (
+                          <span className="profile-menu-tag">{active.id}</span>
+                        )}
                       </span>
                       <span className="profile-menu-meta">
                         {[
@@ -136,7 +159,7 @@ export default function ProfileSwitcher({
                         ].join(" · ")}
                       </span>
                     </span>
-                  </div>
+                  </button>
                 )}
                 {others.length > 0 && (
                   <>
@@ -144,14 +167,14 @@ export default function ProfileSwitcher({
                     <div className="profile-menu-list">
                       {others.map((p) => (
                         <button
-                          key={p.name}
+                          key={p.id}
                           className="profile-menu-item"
                           role="menuitemradio"
                           aria-checked={false}
-                          onClick={() => handleSelect(p.name)}
+                          onClick={() => handleSelect(p.id)}
                         >
                           <ProfileAvatar
-                            name={p.name}
+                            name={p.id}
                             color={p.color}
                             avatar={p.avatar}
                             size={20}
@@ -163,6 +186,9 @@ export default function ProfileSwitcher({
                                 <span className="profile-menu-tag">
                                   {t("agents.defaultTag")}
                                 </span>
+                              )}
+                              {p.id !== p.name && (
+                                <span className="profile-menu-tag">{p.id}</span>
                               )}
                               <span
                                 className={`profile-menu-gateway ${

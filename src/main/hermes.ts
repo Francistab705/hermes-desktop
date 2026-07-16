@@ -6,12 +6,14 @@ import {
   writeFileSync,
   appendFileSync,
   unlinkSync,
+  rmSync,
   mkdirSync,
+  mkdtempSync,
   openSync,
   closeSync,
 } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { homedir, tmpdir } from "os";
 import http from "http";
 import https from "https";
 import net from "net";
@@ -45,12 +47,17 @@ import {
   getActiveProfileNameSync,
 } from "./utils";
 import { getProfilePort } from "./gateway-ports";
+import { promptSudoPassword, promptSecretValue } from "./gatewayPrompt";
+import { getSecret } from "./secrets";
 import { readModels } from "./models";
 import { providerListSafe } from "./secrets";
 import { HIDDEN_SUBPROCESS_OPTIONS } from "./process-options";
 import { type Attachment, escapeXmlAttr } from "../shared/attachments";
 import { type SessionModelOverride } from "../shared/model-override";
-import { URL_KEY_MAP, OPENAI_COMPAT_PROVIDERS } from "../shared/url-key-map";
+import {
+  OPENAI_COMPAT_PROVIDERS,
+  customProviderEnvKey,
+} from "../shared/url-key-map";
 import {
   chatToolEventFromPayload,
   chatToolProgressLabel,
@@ -156,7 +163,11 @@ export function getRemoteAuthHeader(): Record<string, string> {
       return { Authorization: `Bearer ${_sshRemoteApiKey}` };
     return {};
   }
-  if (conn.mode === "remote" && conn.apiKey) {
+  if (
+    conn.mode === "remote" &&
+    conn.remoteAuthMode !== "oauth" &&
+    conn.apiKey
+  ) {
     return { Authorization: `Bearer ${conn.apiKey}` };
   }
   return {};
@@ -268,6 +279,7 @@ function resolveRemoteApiKey(url: string, apiKey?: string): string {
   if (normaliseRemoteUrl(conn.remoteUrl) !== normaliseRemoteUrl(url)) {
     return "";
   }
+  if (conn.remoteAuthMode === "oauth") return "";
   return conn.apiKey;
 }
 
@@ -281,23 +293,123 @@ export async function ensureSshTunnelIfNeeded(): Promise<void> {
   }
 }
 
-/** Pick a Whisper model name appropriate for the provider's base URL. */
-function whisperModelForBaseUrl(baseUrl: string): string {
-  if (/api\.groq\.com/i.test(baseUrl)) return "whisper-large-v3-turbo";
-  // OpenAI and most OpenAI-compatible gateways accept whisper-1.
-  return "whisper-1";
+function audioExtensionForMime(mimeType: string): string {
+  const type = mimeType.split(";", 1)[0].trim().toLowerCase();
+  if (type === "audio/mp4") return ".m4a";
+  if (type === "audio/mpeg") return ".mp3";
+  if (type === "audio/ogg") return ".ogg";
+  if (type === "audio/wav" || type === "audio/x-wav") return ".wav";
+  if (type === "audio/flac") return ".flac";
+  if (type === "video/webm" || type === "audio/webm") return ".webm";
+  return ".webm";
+}
+
+function transcribeAudioViaLocalPython(
+  audio: Uint8Array,
+  mimeType: string,
+  profile?: string,
+): Promise<string> {
+  if (!existsSync(HERMES_PYTHON) || !existsSync(HERMES_REPO)) {
+    throw new Error(
+      "Voice input needs a local Hermes Agent install with speech-to-text support.",
+    );
+  }
+
+  const dir = mkdtempSync(join(tmpdir(), "hermes-desktop-stt-"));
+  const audioPath = join(dir, `speech${audioExtensionForMime(mimeType)}`);
+  writeFileSync(audioPath, Buffer.from(audio));
+
+  const script = [
+    "import json, sys",
+    "from tools.transcription_tools import transcribe_audio",
+    "result = transcribe_audio(sys.argv[1])",
+    "print(json.dumps(result))",
+  ].join("\n");
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn(HERMES_PYTHON, ["-c", script, audioPath], {
+      cwd: HERMES_REPO,
+      env: tuiGatewayEnv(profile),
+      stdio: ["ignore", "pipe", "pipe"],
+      ...HIDDEN_SUBPROCESS_OPTIONS,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    const cleanup = (): void => {
+      try {
+        unlinkSync(audioPath);
+      } catch {
+        // best effort
+      }
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // best effort; the file cleanup above is the important part.
+      }
+    };
+
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf-8");
+    });
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf-8");
+    });
+    proc.on("error", (error) => {
+      cleanup();
+      reject(error);
+    });
+    proc.on("close", (code) => {
+      cleanup();
+      if (code !== 0) {
+        reject(
+          new Error(
+            `Local transcription failed (${code ?? "unknown"}). ${stderr.slice(
+              0,
+              200,
+            )}`.trim(),
+          ),
+        );
+        return;
+      }
+      const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
+      const jsonLine = lines[lines.length - 1] || "";
+      let result: {
+        success?: boolean;
+        transcript?: string;
+        text?: string;
+        error?: string;
+      };
+      try {
+        result = JSON.parse(jsonLine) as typeof result;
+      } catch {
+        reject(
+          new Error(
+            `Local transcription returned an invalid response. ${stdout
+              .slice(0, 200)
+              .trim()}`,
+          ),
+        );
+        return;
+      }
+      if (result.success === false) {
+        reject(new Error(result.error || "Local transcription failed."));
+        return;
+      }
+      resolve((result.transcript || result.text || "").trim());
+    });
+  });
 }
 
 /**
- * Transcribe a recorded audio clip to text via the active profile's provider.
+ * Transcribe a recorded audio clip through the Hermes API server.
  *
- * The local gateway has no audio endpoint, so this goes straight to the
- * profile's OpenAI-compatible provider (`{baseUrl}/audio/transcriptions`) — the
- * same base URL + key the model uses (e.g. Groq Whisper). Used as the desktop's
- * voice-input fallback when the browser SpeechRecognition API is unavailable.
+ * The Python server owns STT provider selection (`stt.provider`, local
+ * faster-whisper, Groq, OpenAI, ElevenLabs, etc.). Keeping desktop voice input
+ * on `/api/audio/transcribe` matches upstream and avoids assuming that the
+ * active chat model endpoint also exposes Whisper-compatible routes.
  *
- * Throws with a user-readable message when no transcription-capable endpoint /
- * key is configured, so the caller can surface it.
+ * Throws with a user-readable message so the caller can surface it.
  */
 export async function transcribeAudio(
   audio: Uint8Array,
@@ -305,59 +417,53 @@ export async function transcribeAudio(
   profile?: string,
 ): Promise<string> {
   const resolved = resolveProfile(profile);
-  const mc = getModelConfig(resolved);
-  const baseUrl = (mc.baseUrl || "").replace(/\/+$/, "");
-  if (!baseUrl) {
-    throw new Error(
-      "Voice input needs an OpenAI-compatible base URL (e.g. Groq) on the active model. Set one in Models, or type your message.",
-    );
-  }
-
-  // Resolve the provider key the same way the chat path does: URL-specific key
-  // first, then the generic CUSTOM_API_KEY / OPENAI_API_KEY fallbacks.
-  // The secrets provider's enumerable map is overlaid BENEATH the `.env` file
-  // (.env wins, mirroring the process.env > .env > provider order used
-  // everywhere else): a no-op for the default env provider, and the only way a
-  // `command`-provider user with vault-stored keys gets an Authorization header.
-  const baseEnv = readEnv(resolved);
-  const providerOverlay = providerListSafe(resolved);
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(baseEnv)) if (v) env[k] = v;
-  for (const [k, v] of Object.entries(providerOverlay))
-    if (v && !env[k]) env[k] = v;
-  let apiKey = "";
-  for (const { pattern, envKey } of URL_KEY_MAP) {
-    if (pattern.test(baseUrl)) {
-      apiKey = (env[envKey] || "").trim();
-      break;
+  if (!isRemoteMode()) {
+    const ready =
+      apiServerAvailable === true ||
+      (await isApiServerReady(resolved)) ||
+      (await startGatewayWithRecovery(resolved));
+    setApiCacheFor(resolved, ready);
+    if (!ready) {
+      throw new Error(
+        "Voice input needs the Hermes API server, but it is not running.",
+      );
     }
   }
-  if (!apiKey) apiKey = (env.CUSTOM_API_KEY || env.OPENAI_API_KEY || "").trim();
 
-  const form = new FormData();
-  form.append(
-    "file",
-    new Blob([audio as BlobPart], { type: mimeType || "audio/webm" }),
-    "speech.webm",
-  );
-  form.append("model", whisperModelForBaseUrl(baseUrl));
-
-  const headers: Record<string, string> = {};
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
-  const res = await fetch(`${baseUrl}/audio/transcriptions`, {
+  const safeMimeType = mimeType || "audio/webm";
+  const body = {
+    data_url: `data:${safeMimeType};base64,${Buffer.from(audio).toString(
+      "base64",
+    )}`,
+    mime_type: safeMimeType,
+  };
+  const res = await fetch(`${getApiUrl(resolved)}/api/audio/transcribe`, {
     method: "POST",
-    headers,
-    body: form,
+    headers: {
+      "Content-Type": "application/json",
+      ...getApiAuthHeaders(resolved),
+    },
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
+    const bodyText = await res.text().catch(() => "");
+    if (!isRemoteMode() && res.status === 404) {
+      return transcribeAudioViaLocalPython(audio, safeMimeType, resolved);
+    }
     throw new Error(
-      `Transcription failed (${res.status}). ${body.slice(0, 200)}`.trim(),
+      `Transcription failed (${res.status}). ${bodyText.slice(0, 200)}`.trim(),
     );
   }
-  const data = (await res.json().catch(() => null)) as { text?: string } | null;
-  return (data?.text || "").trim();
+  const data = (await res.json().catch(() => null)) as {
+    transcript?: string;
+    text?: string;
+  } | null;
+  if (!data) {
+    throw new Error(
+      "Transcription failed. The Hermes API returned an invalid response.",
+    );
+  }
+  return (data.transcript || data.text || "").trim();
 }
 
 interface ChatHandle {
@@ -561,8 +667,8 @@ class TuiGatewayClient {
   }
 
   private async startDashboardBackend(): Promise<void> {
-    if (!existsSync(tuiGatewayPython())) {
-      throw new Error(`Python interpreter not found at ${tuiGatewayPython()}`);
+    if (!existsSync(HERMES_PYTHON)) {
+      throw new Error(`Python interpreter not found at ${HERMES_PYTHON}`);
     }
     if (!existsSync(HERMES_REPO)) {
       throw new Error(`hermes-agent repo not found at ${HERMES_REPO}`);
@@ -589,7 +695,7 @@ class TuiGatewayClient {
       "--port",
       String(this.port),
     ]);
-    const proc = spawn(tuiGatewayPython(), args, {
+    const proc = spawn(HERMES_PYTHON, args, {
       cwd: HERMES_REPO,
       env: dashboardEnv,
       stdio: ["ignore", "pipe", "pipe"],
@@ -779,13 +885,6 @@ function wsDataToString(
 }
 
 const tuiGatewayClients = new Map<string, TuiGatewayClient>();
-
-function tuiGatewayPython(): string {
-  if (process.platform === "win32" && /pythonw\.exe$/i.test(HERMES_PYTHON)) {
-    return HERMES_PYTHON.replace(/pythonw\.exe$/i, "python.exe");
-  }
-  return HERMES_PYTHON;
-}
 
 export function tuiGatewayEnv(profile?: string): Record<string, string> {
   const resolved = resolveProfile(profile);
@@ -1355,6 +1454,7 @@ function sendMessageViaApi(
   // local install degrades to the pre-fix (fingerprint) behaviour
   // rather than 403-looping.
   const hasAuth = "Authorization" in headers;
+  const resumingExistingSession = Boolean(_resumeSessionId);
   let sessionId =
     _resumeSessionId || (hasAuth ? `desk-${Date.now()}-${randomUUID()}` : "");
   if (sessionId) {
@@ -1366,7 +1466,9 @@ function sendMessageViaApi(
     announcedSessionId = id;
     cb.onSessionStarted?.(id);
   }
-  announceSessionId(sessionId);
+  if (resumingExistingSession) {
+    announceSessionId(sessionId);
+  }
 
   let hasContent = false;
   let finished = false; // guard against double callbacks
@@ -1451,6 +1553,7 @@ function sendMessageViaApi(
       try {
         const payload = JSON.parse(data) as Record<string, unknown>;
         const toolEvent = chatToolEventFromPayload(payload);
+        announceSessionId(sessionId);
         if (cb.onToolEvent) {
           cb.onToolEvent(toolEvent);
         }
@@ -1513,6 +1616,7 @@ function sendMessageViaApi(
       // diagnostic probe.
       const reasoningDelta = extractReasoningDelta(delta);
       if (reasoningDelta && cb.onReasoningChunk) {
+        announceSessionId(sessionId);
         cb.onReasoningChunk(reasoningDelta);
       }
 
@@ -1524,6 +1628,7 @@ function sendMessageViaApi(
           cb.onToolProgress(`${match[1]} ${match[2]}`);
         } else {
           hasContent = true;
+          announceSessionId(sessionId);
           cb.onChunk(delta.content);
         }
       }
@@ -1705,7 +1810,16 @@ function sendMessageViaRuns(
   const headers = getJsonApiHeaders(profile, bodyBuf);
   if (sessionId) {
     headers["X-Hermes-Session-Id"] = sessionId;
-    cb.onSessionStarted?.(sessionId);
+  }
+  const resumingExistingSession = Boolean(resumeSessionId);
+  let announcedSessionId = "";
+  function announceSessionId(id: string): void {
+    if (!id || announcedSessionId === id) return;
+    announcedSessionId = id;
+    cb.onSessionStarted?.(id);
+  }
+  if (resumingExistingSession) {
+    announceSessionId(sessionId);
   }
 
   let runId = "";
@@ -1754,6 +1868,7 @@ function sendMessageViaRuns(
       const delta = typeof raw.delta === "string" ? raw.delta : "";
       if (delta) {
         hasContent = true;
+        announceSessionId(sessionId);
         cb.onChunk(delta);
       }
       return;
@@ -1761,12 +1876,14 @@ function sendMessageViaRuns(
 
     const reasoning = runEventReasoningText(raw);
     if (reasoning && cb.onReasoningChunk) {
+      announceSessionId(sessionId);
       cb.onReasoningChunk(reasoning);
       return;
     }
 
     const toolEvent = chatToolEventFromRunEvent(raw);
     if (toolEvent) {
+      announceSessionId(sessionId);
       if (cb.onToolEvent) {
         cb.onToolEvent(toolEvent);
       } else if (cb.onToolProgress) {
@@ -1779,6 +1896,7 @@ function sendMessageViaRuns(
       const output = typeof raw.output === "string" ? raw.output : "";
       if (output && !hasContent) {
         hasContent = true;
+        announceSessionId(sessionId);
         cb.onChunk(output);
       }
       const usage = runCompletedUsage(raw);
@@ -2151,14 +2269,62 @@ async function sendMessageViaTuiGateway(
     }
 
     if (event.type === "sudo.request" || event.type === "secret.request") {
-      // Out of scope for the inline-clarify change: a desktop sudo/secret prompt
-      // carries its own security-review surface and is a deliberate follow-up.
-      void client
-        .request("session.interrupt", { session_id: activeSessionId }, 5_000)
-        .catch(() => undefined);
-      finish(
-        `Hermes requested ${event.type.replace(".request", "")} input, but Hermes One does not yet expose that gateway dialog.`,
-      );
+      const isSudo = event.type === "sudo.request";
+      const requestId =
+        typeof event.payload?.request_id === "string"
+          ? event.payload.request_id
+          : "";
+      if (!requestId) {
+        void client
+          .request("session.interrupt", { session_id: activeSessionId }, 5_000)
+          .catch(() => undefined);
+        finish(
+          `Hermes requested ${event.type.replace(".request", "")} input, but the gateway provided no request_id to answer.`,
+        );
+        return;
+      }
+      // A sudo password / secret value is sensitive — collect it in the
+      // hardened askpass modal (never the chat transcript) and forward it to
+      // the gateway. Cancel maps to "" (a safe skip the gateway handles).
+      //
+      // For secret.request: try the configured security provider first. If the
+      // vault already holds the key, answer silently without prompting the user.
+      const payload = event.payload as
+        | { prompt?: string; env_var?: string }
+        | undefined;
+      const envVar = String(payload?.env_var ?? "");
+
+      // Vault-first resolution for secret.request: attempt a provider lookup
+      // before falling back to the interactive modal. sudo.request always needs
+      // an interactive password — no vault lookup applies.
+      const vaultValue = !isSudo && envVar ? getSecret(envVar, profile) : null;
+
+      const collect: Promise<string> =
+        vaultValue != null
+          ? Promise.resolve(vaultValue)
+          : isSudo
+            ? promptSudoPassword()
+            : promptSecretValue(envVar, String(payload?.prompt ?? ""));
+
+      void collect
+        .then((answer) => {
+          if (finished) return; // turn was cancelled while modal was open
+          const method = isSudo ? "sudo.respond" : "secret.respond";
+          const params = isSudo
+            ? { request_id: requestId, password: answer }
+            : { request_id: requestId, value: answer };
+          return client.request(method, params, 300_000);
+        })
+        .catch((error) => {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          if (!hasGatewayOutput) {
+            startApiFallback(message);
+            return;
+          }
+          finish(message);
+        });
+      return;
     }
   });
 
@@ -2469,10 +2635,11 @@ function sendMessageViaCli(
         const models = readModels();
         const matching = models.find((m) => m.baseUrl === mc.baseUrl);
         if (matching) {
-          const envKey2 =
-            "CUSTOM_PROVIDER_" +
-            matching.name.replace(/[^A-Za-z0-9]/g, "_").toUpperCase() +
-            "_KEY";
+          // Key off the provider label (stable across all of a named custom
+          // provider's models) when present, else the model's own name.
+          const envKey2 = customProviderEnvKey(
+            matching.providerLabel || matching.name,
+          );
           resolvedKey = profileEnv[envKey2] || env[envKey2] || "";
         }
       } catch {
@@ -3383,7 +3550,15 @@ export function testRemoteConnection(
   apiKey?: string,
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    const target = `${normaliseRemoteUrl(url)}/health`;
+    const conn = getConnectionConfig();
+    const configuredOAuth =
+      apiKey === undefined &&
+      conn.mode === "remote" &&
+      conn.remoteAuthMode === "oauth" &&
+      normaliseRemoteUrl(conn.remoteUrl) === normaliseRemoteUrl(url);
+    const target = `${normaliseRemoteUrl(url)}${
+      configuredOAuth ? "/api/status" : "/health"
+    }`;
     const mod = target.startsWith("https") ? https : http;
     const headers: Record<string, string> = {};
     const resolvedApiKey = resolveRemoteApiKey(url, apiKey);

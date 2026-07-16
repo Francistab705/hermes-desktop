@@ -4,12 +4,15 @@ export default {
   noModel: "No model set",
   auto: "Auto",
   commandsTitle: "Commands",
-  typeMessage: "Type a message... (Shift+Enter for new line)",
+  typeMessage: "Ask anything",
   quickAskTitle:
     "Quick Ask (/btw) — side question that won't affect conversation context",
   send: "Send",
   searchModels: "Search models...",
   custom: "Custom",
+  allModels: "All models",
+  noModelsMatch: "No models match",
+  configure: "Configure",
   typeModelName: "Type model name...",
   reasoningEffort: {
     title: "Reasoning Level",

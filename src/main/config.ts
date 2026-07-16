@@ -41,11 +41,13 @@ export interface SshConnectionConfig {
 }
 
 export type RemoteChatTransport = "auto" | "dashboard" | "legacy";
+export type RemoteAuthMode = "auto" | "token" | "oauth";
 
 export interface ConnectionConfig {
   mode: "local" | "remote" | "ssh";
   remoteUrl: string;
   apiKey: string;
+  remoteAuthMode: RemoteAuthMode;
   remoteChatTransport: RemoteChatTransport;
   sshChatTransport: RemoteChatTransport;
   ssh: SshConnectionConfig;
@@ -54,6 +56,7 @@ export interface ConnectionConfig {
 export interface PublicConnectionConfig {
   mode: "local" | "remote" | "ssh";
   remoteUrl: string;
+  remoteAuthMode: RemoteAuthMode;
   remoteChatTransport: RemoteChatTransport;
   sshChatTransport: RemoteChatTransport;
   hasApiKey: boolean;
@@ -74,6 +77,10 @@ export function normalizeRemoteChatTransport(
   value: unknown,
 ): RemoteChatTransport {
   return value === "dashboard" || value === "legacy" ? value : "auto";
+}
+
+export function normalizeRemoteAuthMode(value: unknown): RemoteAuthMode {
+  return value === "token" || value === "oauth" ? value : "auto";
 }
 
 export function readDesktopConfig(): Record<string, unknown> {
@@ -100,6 +107,7 @@ export function getConnectionConfig(): ConnectionConfig {
     mode: (data.connectionMode as "local" | "remote" | "ssh") || "local",
     remoteUrl: (data.remoteUrl as string) || "",
     apiKey: (data.remoteApiKey as string) || "",
+    remoteAuthMode: normalizeRemoteAuthMode(data.remoteAuthMode),
     remoteChatTransport: normalizeRemoteChatTransport(data.remoteChatTransport),
     sshChatTransport: normalizeRemoteChatTransport(data.sshChatTransport),
     ssh: {
@@ -118,6 +126,7 @@ export function getPublicConnectionConfig(): PublicConnectionConfig {
   return {
     mode: config.mode,
     remoteUrl: config.remoteUrl,
+    remoteAuthMode: config.remoteAuthMode,
     remoteChatTransport: config.remoteChatTransport,
     sshChatTransport: config.sshChatTransport,
     hasApiKey: config.apiKey.length > 0,
@@ -135,6 +144,7 @@ export function setConnectionConfig(config: ConnectionConfig): void {
   if (config.mode === "remote" || config.apiKey.trim()) {
     data.remoteApiKey = config.apiKey;
   }
+  data.remoteAuthMode = normalizeRemoteAuthMode(config.remoteAuthMode);
   data.remoteChatTransport = normalizeRemoteChatTransport(
     config.remoteChatTransport,
   );
@@ -942,6 +952,13 @@ export function setModelConfig(
   // for callers that don't manage it); a positive number sets it; `null` or a
   // non-positive number removes it (auto-detection / heuristic resumes).
   contextLength?: number | null,
+  // Optional API-protocol override mirrored into `model.api_mode` (the agent's
+  // runtime-provider resolver reads it to pick the transport for
+  // custom/compatible endpoints). `undefined` leaves the key untouched
+  // (back-compat); a non-empty string (e.g. `"anthropic_messages"`,
+  // `"chat_completions"`) sets it; `null`/empty removes it so the agent
+  // re-detects the transport from the base URL.
+  apiMode?: string | null,
 ): void {
   invalidateCache(`mc:${profile || "default"}`);
   const { configFile } = profilePaths(profile);
@@ -1067,6 +1084,26 @@ export function setModelConfig(
       );
     } else {
       content = removeBlockChild(content, "model", "context_length");
+    }
+  }
+
+  // Mirror the activated model's API-protocol override into `model.api_mode`.
+  // This MUST be rewritten on every switch: the gateway honors a persisted
+  // `model.api_mode` for custom/compatible providers, so a value left behind
+  // by a previously-active model would route the new endpoint over the wrong
+  // protocol — e.g. switching from an Anthropic-compatible endpoint
+  // (api_mode: anthropic_messages) to an OpenAI-compatible one would keep
+  // hitting /v1/messages and 404 / drop the connection (fathah/hermes-desktop
+  // — "connection lost switching OpenAI- and Anthropic-compatible models").
+  // Skip when `undefined` so callers that don't track it leave any user-set
+  // value alone; a non-empty string sets it; `null`/empty removes it so the
+  // agent auto-detects the transport from `base_url` again.
+  if (apiMode !== undefined) {
+    const trimmedMode = (apiMode || "").trim();
+    if (trimmedMode) {
+      content = upsertBlockChild(content, "model", "api_mode", trimmedMode);
+    } else {
+      content = removeBlockChild(content, "model", "api_mode");
     }
   }
 
