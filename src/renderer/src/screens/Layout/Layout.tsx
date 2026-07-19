@@ -77,7 +77,7 @@ const PINNED_NAV_ITEMS: {
   { view: "discover", icon: Compass, labelKey: "navigation.discover" },
   // "agents" (Profiles) is reached from the sidebar-footer ProfileSwitcher's
   // "Manage profiles" action rather than a top-level nav item.
-  { view: "office", icon: Building, labelKey: "navigation.office" },
+  { view: "tools", icon: Workflow, labelKey: "navigation.tools" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
@@ -88,7 +88,7 @@ const PINNED_NAV_ITEMS: {
 const FOOTER_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
-  { view: "tools", icon: Workflow, labelKey: "navigation.tools" },
+  { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "memory", icon: Brain, labelKey: "navigation.memory" },
 ];
 

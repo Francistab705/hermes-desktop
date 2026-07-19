@@ -124,6 +124,14 @@ import {
   stopDashboard,
 } from "../dashboard";
 import {
+  getWorkshopStatus,
+  interruptWorkshopSubagent,
+  listWorkshopHistory,
+  loadWorkshopHistory,
+  saveWorkshopHistory,
+  setWorkshopPaused,
+} from "../workshop";
+import {
   clearRemoteOAuthSession,
   connectionConfigAfterRemoteOAuthLogin,
   openRemoteOAuthLogin,
@@ -1716,6 +1724,43 @@ export function registerIpcHandlers(context: IpcContext): void {
   );
   ipcMain.handle("stop-dashboard", (_event, profile?: string) =>
     stopDashboard(profile),
+  );
+
+  // @lat: [[workshop]]
+  ipcMain.handle("workshop-status", (_event, profile?: string) =>
+    getWorkshopStatus(profile),
+  );
+  ipcMain.handle(
+    "workshop-pause",
+    (_event, paused: boolean, profile?: string) =>
+      setWorkshopPaused(profile, paused),
+  );
+  ipcMain.handle(
+    "workshop-subagent-interrupt",
+    (_event, subagentId: string, profile?: string) =>
+      interruptWorkshopSubagent(profile, subagentId),
+  );
+  ipcMain.handle("workshop-history-list", (_event, profile?: string) =>
+    listWorkshopHistory(profile),
+  );
+  ipcMain.handle(
+    "workshop-history-load",
+    (_event, path: string, profile?: string) =>
+      loadWorkshopHistory(profile, path),
+  );
+  ipcMain.handle(
+    "workshop-history-save",
+    (
+      _event,
+      sessionId?: string,
+      profile?: string,
+      events?: Array<{
+        type: string;
+        payload?: Record<string, unknown>;
+        session_id?: string;
+      }>,
+    ) =>
+      saveWorkshopHistory(profile, sessionId, events),
   );
 
   // Platform toggles (config.yaml platforms section)
